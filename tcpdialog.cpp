@@ -10,6 +10,11 @@
 #include <QHostAddress>
 #include <QMessageBox>
 #include <QDataStream>
+#include <QtSerialPort/QSerialPort>
+#include <QSerialPortInfo>
+#include <QTabWidget>
+#include <QRadioButton>
+#include <QThread>
 
 TcpDialog::TcpDialog(QWidget *parent) :
     QDialog(parent)
@@ -17,30 +22,43 @@ TcpDialog::TcpDialog(QWidget *parent) :
     setupUi(this);
     sendFlag=0;
     times=0;
+    browsepushButton->setEnabled(false);
     connectpushButton->setEnabled(true);
     unconnectpushButton->setEnabled(false);
+    erasepushButton->setEnabled(false);
+    uploadpushButton->setEnabled(false);
+    sendpushButton->setEnabled(false);
+    usart_startpushButton->setEnabled(false);
+    usart_uploadpushButton->setEnabled(false);
     progressBar->hide();
     iplineEdit->setPlaceholderText(tr("192.168.4.1"));
     portlineEdit->setPlaceholderText("8086");
-    //progressBar->setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Ignored);
+    serial= new QSerialPort(this);
     connect(browsepushButton,SIGNAL(clicked(bool)),this,SLOT(browseFile()));
-    connect(this,SIGNAL(haveOpenedFile()),this,SLOT(readFile()));
     connect(connectpushButton,SIGNAL(clicked(bool)),this,SLOT(connectToServer()));
     connect(unconnectpushButton,SIGNAL(clicked(bool)),this,SLOT(closeConnection()));
+    connect(uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(clientReady()));
+    connect(usart_uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(uploadFile()));
+    connect(usart_startpushButton,SIGNAL(clicked(bool)),this,SLOT(startApplication()));
     connect(clearpushButton,SIGNAL(clicked(bool)),this,SLOT(clearReceiveBuf()));
+    connect(erasepushButton,SIGNAL(clicked(bool)),this,SLOT(sendEraseData()));
+    connect(openradioButton,SIGNAL(toggled(bool)),this,SLOT(toggleSerialPort()));
+    connect(refreshpushButton,SIGNAL(clicked(bool)),this,SLOT(refreshSerialPorts()));
     connect(&tcpSocket,SIGNAL(connected()),this,SLOT(connectedToServer()));
     connect(&tcpSocket,SIGNAL(readyRead()),this,SLOT(readFromServer()));
     connect(&tcpSocket,SIGNAL(disconnected()),this,SLOT(disconnectedToServer()));
     connect(&tcpSocket,SIGNAL(error(QAbstractSocket::SocketError)),this,SLOT(connectionError()));
-    connect(uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(readFile()));
+    connect(serial,SIGNAL(readyRead()),this,SLOT(readSerialData()));
+    connect(this,SIGNAL(haveOpenedFile()),this,SLOT(readFile()));
     connect(this,SIGNAL(sendAckToServer()),this,SLOT(returnAck()));
-
+    connect(this,SIGNAL(gotSerialData()),this,SLOT(uploadFile()));
+    fillPortsParameters();
+    fillPortsNames();
 }
 
 TcpDialog::~TcpDialog()
 {
-    //delete tcpSocket;
-    //delete ui;
+
 }
 
 void TcpDialog::browseFile()
@@ -64,14 +82,22 @@ void TcpDialog::browseFile()
 
         else
         {
-            plainTextEdit->insertPlainText(tr("\n this File is opened , send signal 0f ready to Server \n"));
-            //TO DO
+             //TO DO
             //Add the Function  :
-            clientReady();
+             plainTextEdit->insertPlainText(tr("\n this File is opened , Please go on  \n"));
+             if(connectpushButton->isChecked())
+             {
+                 uploadpushButton->setEnabled(true);
+             }
+            if(openradioButton->isChecked())
+            {
+                usart_uploadpushButton->setEnabled(true);
+            }
             //TO DO
         }
     }
 }
+
 
 //read the file and load the array
 void TcpDialog::readFile()
@@ -82,32 +108,25 @@ void TcpDialog::readFile()
     binArray[1]=252;
     length=file.read(&(binArray[2]),252);    //length must be the multiple of 4 ,
     binArray[1]=length;
-   // binArray[2+length]=0x20;
-    if((length<252)||(file.atEnd()))
+    if((length<252)||(file.atEnd()))       
+    {
         binArray[0]=0x02;
-    tcpSocket.write(binArray,(length+2));
-    //times++;
-     if(file.atEnd())
-     {
-         plainTextEdit->insertPlainText(tr("the last length is %1 \n").arg(length));
-         plainTextEdit->insertPlainText(QByteArray(binArray).toHex());
-        file.close();
         sendFlag=1;
-       // emit
-     }
+        file.close();
+    }
+    tcpSocket.write(binArray,(length+2));   
 }
 
 void TcpDialog::connectToServer()
 {
-    //QHostAddress  ipAdress = iplineEdit->text();
     if((!iplineEdit->text().isEmpty())&&(!portlineEdit->text().isEmpty()))
     {
         QString ipAdress = iplineEdit->text();
          quint64 port = portlineEdit->text().toInt();
-         //quint64 port = 8086;
         tcpSocket.connectToHost(ipAdress,port);
         connectpushButton->setEnabled(false);
         unconnectpushButton->setEnabled(true);
+        //erasepushButton->setEnabled(true);
         plainTextEdit->insertPlainText(tr("connecting ......\n"));
         progressBar->show();
     }
@@ -121,6 +140,8 @@ void TcpDialog::connectedToServer()
 {
     QString ipAdress = tcpSocket.peerAddress().toString();
     quint64 port = tcpSocket.peerPort();
+    erasepushButton->setEnabled(true);
+    browsepushButton->setEnabled(true);
     plainTextEdit->insertPlainText(tr("connected to Host \nIP: %1 ,Port:  %2 \n").arg(ipAdress).arg(port));
     progressBar->hide();
 }
@@ -135,11 +156,18 @@ void TcpDialog::disconnectedToServer()
 
 void TcpDialog::closeConnection()
 {
-    tcpSocket.close();
+    tcpSocket.flush();
     connectpushButton->setEnabled(true);
     unconnectpushButton->setEnabled(false);
+    browsepushButton->setEnabled(false);
+    erasepushButton->setEnabled(false);
+    uploadpushButton->setEnabled(false);
+    sendpushButton->setEnabled(false);
+    lineEdit->clear();
+    sendFlag=0;
+    times=0;
+    tcpSocket.close();
     plainTextEdit->insertPlainText(tr("close the current Tcp connection. \n"));
-    progressBar->hide();
 }
 
 void TcpDialog::clearReceiveBuf()
@@ -156,7 +184,7 @@ void TcpDialog::connectionError()
 
 void TcpDialog::sendMessageToServer()
 {
-    QByteArray bin("what is fuck");
+    QByteArray bin("test");
     tcpSocket.write(bin);
 }
 
@@ -180,9 +208,34 @@ void TcpDialog::sendMessageToServer()
 */
 void TcpDialog::readFromServer()
 {
-    if(tcpSocket.bytesAvailable()==1) return;
+    /*if(tcpSocket.bytesAvailable()==1) return;
     QByteArray str =  tcpSocket.readAll();
-    char *echo=str.data();
+    //QByteArray str =  tcpSocket.read(2);
+    */
+    //above is OK ,however it can't work at some situation
+    char echo[2];
+    if(tcpSocket.bytesAvailable()==1)
+    {
+        return;
+    }
+    else if(tcpSocket.bytesAvailable()>=2)
+    {
+        QByteArray str=tcpSocket.read(1);
+       char *temp1=str.data();
+       if((temp1[0]&0xf0)==0)
+       {
+           QByteArray str1=tcpSocket.read(1);
+           char *temp2=str1.data();
+           echo[0]=temp1[0];
+           echo[1]=temp2[0];
+       }
+       else
+       {
+           echo[0]=0x01;
+           echo[1]=temp1[0];
+           //return;
+       }
+    }
     progressBar->show();
     if((echo[0]==0x01)&&(echo[1]==0x20))
     {
@@ -196,7 +249,7 @@ void TcpDialog::readFromServer()
     else if((echo[0]==0x02)&&(echo[1]==0x20))
     {
         //TO DO
-        //   add signals of end the task
+        //add signals of end the task
         //emit sendAckToServer();
         returnAck();
         plainTextEdit->insertPlainText("got the 0x02 and 0x20 \n");
@@ -210,12 +263,15 @@ void TcpDialog::readFromServer()
         //TO DO
         //plainTextEdit->insertPlainText("got the 0x01 and 0x21 \n");
         if(sendFlag==0)
-        {          
-            readFile();
-            times++;
-            if(times%250==0)
+        {
+             for(quint8 i=0;i<5;i++)
             {
-                plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*252.0/1024.0));
+                readFile();
+             }
+            times++;
+            if(times%100==0)
+            {
+                plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*5*252.0/1024.0));
             }
         }
         else if(sendFlag==1)
@@ -225,7 +281,8 @@ void TcpDialog::readFromServer()
     }
     else
     {
-        plainTextEdit->insertPlainText(str.toHex());
+        plainTextEdit->insertPlainText(QByteArray(echo).toHex());
+        //plainTextEdit->insertPlainText(str.toHex());
         plainTextEdit->appendPlainText(tr("\n"));
     }
 }
@@ -243,4 +300,216 @@ void TcpDialog::clientReady()
     tcpSocket.write(readySignal,sizeof(readySignal));
 }
 
+void TcpDialog::sendEraseData()
+{
+    //TO DO
+    //there should be sending the customed erase signal
+    //and  you should match the signal in the firmware of ESP8266
+    char eraseSignal[2]={0x03,0x20};
+    tcpSocket.write(eraseSignal,sizeof(eraseSignal));
+    //TO DO
+}
 
+///////////////////////////////////////////////////////////////////////////////
+void TcpDialog::fillPortsParameters()
+{
+    baudRatecomboBox->addItem(QStringLiteral("9600"), QSerialPort::Baud9600);
+    baudRatecomboBox->addItem(QStringLiteral("57600"),QSerialPort::Baud57600);
+    baudRatecomboBox->addItem(QStringLiteral("115200"),QSerialPort::Baud115200);
+    baudRatecomboBox->addItem(tr("Custom"));
+
+    stopBitscomboBox->addItem(QStringLiteral("1"),QSerialPort::OneStop);
+    stopBitscomboBox->addItem(QStringLiteral("2"),QSerialPort::TwoStop);
+
+    dataBitscomboBox->addItem(QStringLiteral("7"),QSerialPort::Data7);
+    dataBitscomboBox->addItem(QStringLiteral("8"),QSerialPort::Data8);
+    dataBitscomboBox->setCurrentIndex(1);
+
+    paritycomboBox->addItem(QStringLiteral("Even"),QSerialPort::EvenParity);
+    paritycomboBox->addItem(QStringLiteral("Odd"),QSerialPort::OddParity);
+    paritycomboBox->addItem(QStringLiteral("None"),QSerialPort::NoParity);
+    paritycomboBox->setCurrentIndex(2);
+}
+
+void TcpDialog::fillPortsNames()
+{
+    foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts()) {
+        QStringList list;
+        list << info.portName();
+        serialPortcomboBox->addItem(list.first(),list);
+    }
+    serialPortcomboBox->addItem(tr("Custom"));
+}
+
+void TcpDialog::refreshSerialPorts()
+{
+    serialPortcomboBox->clear();
+    foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts()) {
+        QStringList list;
+        list << info.portName()  ;
+        serialPortcomboBox->addItem(list.first(),list);
+    }
+    serialPortcomboBox->addItem(tr("Custom"));
+}
+
+void TcpDialog::startSerialPort()
+{
+    Settings p ;
+    p.name = serialPortcomboBox->currentText();
+    p.baudRate = static_cast<QSerialPort::BaudRate>(
+                 baudRatecomboBox->itemData( baudRatecomboBox->currentIndex()).toInt());
+    p.stringBaudRate = QString::number(p.baudRate);
+    p.dataBits =static_cast<QSerialPort::DataBits>(
+                dataBitscomboBox->itemData(dataBitscomboBox->currentIndex()).toInt());
+    p.stringDataBits =  dataBitscomboBox->currentText();
+    p.stopBits = static_cast<QSerialPort::StopBits>(
+                stopBitscomboBox->itemData(stopBitscomboBox->currentIndex()).toInt());
+    p.stringStopBits = stopBitscomboBox->currentText();
+    p.parity = static_cast<QSerialPort::Parity>(
+                paritycomboBox->itemData(paritycomboBox->currentIndex()).toInt());
+    p.stringParity = paritycomboBox->currentText();
+   // p.flowControl =
+
+    serial->setPortName(p.name);
+    serial->setBaudRate(p.baudRate);
+    serial->setDataBits(p.dataBits);
+    serial->setParity(p.parity);
+    serial->setStopBits(p.stopBits);
+    serial->setFlowControl(QSerialPort::NoFlowControl);
+    if (serial->open(QIODevice::ReadWrite))
+    {
+         plainTextEdit->insertPlainText(tr("Connected to %1 : %2, %3, %4, %5")
+                          .arg(p.name).arg(p.stringBaudRate).arg(p.stringDataBits)
+                          .arg(p.stringParity).arg(p.stringStopBits));
+    }
+    else
+    {
+        QMessageBox::critical(this, tr("Error"), serial->errorString());
+    }
+    //okpushButton->setEnabled(true);
+    browsepushButton->setEnabled(true);
+   // usart_startpushButton->setEnabled(true);
+   // usart_uploadpushButton->setEnabled(true);
+    connectpushButton->setEnabled(false);
+}
+
+void TcpDialog::closeSerialPort()
+{
+    if(serial->isOpen())
+    {
+        serial->close();
+    }
+    plainTextEdit->insertPlainText(tr("SerialPort is closed. \n"));
+    connectpushButton->setEnabled(true);
+    usart_startpushButton->setEnabled(false);
+    usart_uploadpushButton->setEnabled(false);
+    browsepushButton->setEnabled(false);
+}
+
+
+void TcpDialog::toggleSerialPort()
+{
+    if(openradioButton->isChecked())
+    {
+        startSerialPort();
+    }
+    else
+    {
+        closeSerialPort();
+    }
+}
+
+void TcpDialog::startApplication()
+{
+    char rebootData[2]={0x30,0x20};
+    serial->write(rebootData,sizeof(rebootData));
+}
+
+void TcpDialog::uploadFile()
+{
+    switch (progressNumber) {
+    case 0:
+        enterBootloader();
+        plainTextEdit->insertPlainText("fuck");
+        progressNumber++;
+        break;
+    case 1:
+        eraseChip();
+        progressNumber++;
+        break;
+    case 2:
+
+        if(sendFlag==0)
+        {
+            multiProgData();
+            times++;
+            if((times%500)==0)
+            {
+                plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*252.0/1024.0));
+            }
+
+        }
+        else
+        {
+          plainTextEdit->insertPlainText(tr("finish to MultiProgram , you can do start Application \n"));
+          usart_startpushButton->setEnabled(true);
+          progressNumber++;
+        }
+
+        break;
+    default:
+        break;
+    }
+}
+
+void TcpDialog::enterBootloader()
+{
+    char Reboot_ID1[41]={0xfe,0x21,0x72,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x01,0x00,0x00,0x48,0xf0};
+    char Reboot_ID0[41]={0xfe,0x21,0x45,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x00,0x00,0x00,0xd7,0xac};
+    char insyncData[2]={0x21,0x20};
+    serial->write(insyncData,sizeof(insyncData));
+
+    serial->write(Reboot_ID0,sizeof(Reboot_ID0));
+    serial->write(Reboot_ID1,sizeof(Reboot_ID1));
+    QThread::msleep(1500);
+    serial->readAll();       //clear the receive buffer.
+    serial->write(insyncData,sizeof(insyncData));
+}
+
+void TcpDialog::eraseChip()
+{
+    char eraseData[2]={0x23,0x20};
+    serial->write(eraseData,sizeof(eraseData));
+}
+
+void TcpDialog::multiProgData()
+{
+
+        qint64 length=0;
+        char binArray[255]={0};
+        binArray[0]=0x27;
+        binArray[1]=252;
+        length=file.read(&(binArray[2]),252);    //length must be the multiple of 4 ,
+        binArray[1]=length;
+        binArray[length+2]=0x20;
+        if((length<252)||(file.atEnd()))
+        {
+            sendFlag=1;
+            file.close();
+        }
+        serial->write(binArray,length+3);
+}
+
+void TcpDialog::readSerialData()
+{
+    QByteArray serialReceiveData = serial->read(2);
+    char* serialBuf = serialReceiveData.data();
+    //plainTextEdit->insertPlainText(QString(serialReceiveData));
+    if((serialBuf[0]==0x12)&&(serialBuf[1]==0x10))
+    {
+        plainTextEdit->insertPlainText("send data OK \n");
+        emit gotSerialData();
+    }
+    else
+    {}
+}
