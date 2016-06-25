@@ -25,6 +25,8 @@ public:
     void enterBootloader();
     void eraseChip();
     void multiProgData();
+    void buttonInit();
+    void startApplication();
    // void uploadFile();
 
      struct Settings {
@@ -48,6 +50,8 @@ signals:
     void haveOpenedFile();
     void sendAckToServer();
     void gotSerialData();
+    void wifi_fileOpened();
+    void usart_fileOpened();
 
 private slots:
     void browseFile();
@@ -65,9 +69,11 @@ private slots:
     void sendEraseData();
     void refreshSerialPorts();
     void toggleSerialPort();
-    void startApplication();
+
     void uploadFile();
     void readSerialData();
+    void wifi_openFile();
+    void usart_openFile();
 
 private:
     QTcpSocket tcpSocket ;

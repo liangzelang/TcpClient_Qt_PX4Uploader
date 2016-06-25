@@ -20,26 +20,27 @@ TcpDialog::TcpDialog(QWidget *parent) :
     QDialog(parent)
 {
     setupUi(this);
+    serial= new QSerialPort(this);
     sendFlag=0;
     times=0;
-    browsepushButton->setEnabled(false);
-    connectpushButton->setEnabled(true);
-    unconnectpushButton->setEnabled(false);
-    erasepushButton->setEnabled(false);
-    uploadpushButton->setEnabled(false);
-    sendpushButton->setEnabled(false);
-    usart_startpushButton->setEnabled(false);
-    usart_uploadpushButton->setEnabled(false);
-    progressBar->hide();
-    iplineEdit->setPlaceholderText(tr("192.168.4.1"));
-    portlineEdit->setPlaceholderText("8086");
-    serial= new QSerialPort(this);
+    buttonInit();
+    progressBar->hide();    
+    iplineEdit->setText(tr("192.168.4.1"));
+    portlineEdit->setText("8086");
     connect(browsepushButton,SIGNAL(clicked(bool)),this,SLOT(browseFile()));
     connect(connectpushButton,SIGNAL(clicked(bool)),this,SLOT(connectToServer()));
     connect(unconnectpushButton,SIGNAL(clicked(bool)),this,SLOT(closeConnection()));
-    connect(uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(clientReady()));
-    connect(usart_uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(uploadFile()));
-    connect(usart_startpushButton,SIGNAL(clicked(bool)),this,SLOT(startApplication()));
+
+    connect(this,SIGNAL(wifi_fileOpened()),this,SLOT(clientReady()));
+
+    connect(uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(wifi_openFile()));
+
+    connect(usart_uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(usart_openFile()));
+
+    connect(this,SIGNAL(usart_fileOpened()),this,SLOT(uploadFile()));
+
+   // connect(usart_startpushButton,SIGNAL(clicked(bool)),this,SLOT(startApplication()));
+
     connect(clearpushButton,SIGNAL(clicked(bool)),this,SLOT(clearReceiveBuf()));
     connect(erasepushButton,SIGNAL(clicked(bool)),this,SLOT(sendEraseData()));
     connect(openradioButton,SIGNAL(toggled(bool)),this,SLOT(toggleSerialPort()));
@@ -61,41 +62,74 @@ TcpDialog::~TcpDialog()
 
 }
 
+void TcpDialog::buttonInit()
+{
+    browsepushButton->setEnabled(false);
+    connectpushButton->setEnabled(true);
+    unconnectpushButton->setEnabled(false);
+    erasepushButton->setEnabled(false);
+    uploadpushButton->setEnabled(false);
+    sendpushButton->setEnabled(false);
+    usart_startpushButton->setEnabled(false);
+    usart_uploadpushButton->setEnabled(false);
+}
+
+
+
 void TcpDialog::browseFile()
 {
 
-    QString initialName = lineEdit->text();     //default get the path from the lineEdit component
-    if(initialName.isEmpty())                            //if the default path is empty ,I set the home path as the default
+    QString initialName = lineEdit->text();                                                                   //default get the path from the lineEdit component
+    if(initialName.isEmpty())                                                                                          //if the default path is empty ,I set the home path as the default
             initialName = QDir::homePath();
     fileName =QFileDialog::getOpenFileName(this,tr("choose file"),initialName);  //at the path:initialName ,user choose which file to upload
-    fileName =QDir::toNativeSeparators(fileName);
-    lineEdit->setText(fileName);
-    plainTextEdit->insertPlainText(fileName);
+    fileName =QDir::toNativeSeparators(fileName);                                                   //localize the separators based on the system
+    lineEdit->setText(fileName);                                                                                     //input the path of the file into the lineEdit
+    plainTextEdit->insertPlainText(fileName);                                                               //input the same message into the plainTextEdit
+    uploadpushButton->setEnabled(true);
+    usart_uploadpushButton->setEnabled(true);
+}
+
+void TcpDialog::wifi_openFile()
+{
     if(!fileName.isEmpty())
     {
          file.setFileName(fileName);
-
         if(!file.open(QIODevice::ReadOnly))
         {
             qDebug()<<"can't open the file!"<<endl;
         }
-
         else
         {
              //TO DO
             //Add the Function  :
              plainTextEdit->insertPlainText(tr("\n this File is opened , Please go on  \n"));
-             if(connectpushButton->isChecked())
-             {
-                 uploadpushButton->setEnabled(true);
-             }
-            if(openradioButton->isChecked())
-            {
-                usart_uploadpushButton->setEnabled(true);
-            }
+             progressBar->setMaximum(file.size()>>10);
+             emit wifi_fileOpened();
             //TO DO
         }
     }
+}
+
+void TcpDialog::usart_openFile()
+{
+    if(!fileName.isEmpty())
+    {
+         file.setFileName(fileName);
+        if(!file.open(QIODevice::ReadOnly))
+        {
+            qDebug()<<"can't open the file!"<<endl;
+        }
+        else
+        {
+             //TO DO
+             plainTextEdit->insertPlainText(tr("\n this File is opened , Please go on  \n"));
+             progressBar->setMaximum(file.size()>>10);
+             emit usart_fileOpened();
+            //TO DO
+        }
+    }
+
 }
 
 
@@ -113,6 +147,7 @@ void TcpDialog::readFile()
         binArray[0]=0x02;
         sendFlag=1;
         file.close();
+        //file.seek(0);
     }
     tcpSocket.write(binArray,(length+2));   
 }
@@ -128,6 +163,7 @@ void TcpDialog::connectToServer()
         unconnectpushButton->setEnabled(true);
         //erasepushButton->setEnabled(true);
         plainTextEdit->insertPlainText(tr("connecting ......\n"));
+        progressBar->setValue(0);
         progressBar->show();
     }
     else
@@ -157,16 +193,18 @@ void TcpDialog::disconnectedToServer()
 void TcpDialog::closeConnection()
 {
     tcpSocket.flush();
+    file.close();
     connectpushButton->setEnabled(true);
     unconnectpushButton->setEnabled(false);
     browsepushButton->setEnabled(false);
     erasepushButton->setEnabled(false);
-    uploadpushButton->setEnabled(false);
+    //uploadpushButton->setEnabled(false);
     sendpushButton->setEnabled(false);
-    lineEdit->clear();
+    //lineEdit->clear();
     sendFlag=0;
     times=0;
     tcpSocket.close();
+    progressBar->hide();
     plainTextEdit->insertPlainText(tr("close the current Tcp connection. \n"));
 }
 
@@ -208,12 +246,13 @@ void TcpDialog::sendMessageToServer()
 */
 void TcpDialog::readFromServer()
 {
-    /*if(tcpSocket.bytesAvailable()==1) return;
-    QByteArray str =  tcpSocket.readAll();
+    if(tcpSocket.bytesAvailable()==1) return;
+    QByteArray str =  tcpSocket.read(2);
+    char *echo =str.data();
     //QByteArray str =  tcpSocket.read(2);
-    */
+
     //above is OK ,however it can't work at some situation
-    char echo[2];
+   /* char echo[2];
     if(tcpSocket.bytesAvailable()==1)
     {
         return;
@@ -235,7 +274,7 @@ void TcpDialog::readFromServer()
            echo[1]=temp1[0];
            //return;
        }
-    }
+    }*/
     progressBar->show();
     if((echo[0]==0x01)&&(echo[1]==0x20))
     {
@@ -244,6 +283,7 @@ void TcpDialog::readFromServer()
         plainTextEdit->insertPlainText("got the 0x01 and 0x20 \n");
         plainTextEdit->insertPlainText("return the Ack  \n");
         emit sendAckToServer();
+        //progressBar->setValue(100);
         //TO DO
     }
     else if((echo[0]==0x02)&&(echo[1]==0x20))
@@ -273,6 +313,7 @@ void TcpDialog::readFromServer()
             {
                 plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*5*252.0/1024.0));
             }
+            progressBar->setValue(times*5*252>>10);
         }
         else if(sendFlag==1)
         {
@@ -297,7 +338,7 @@ void TcpDialog::returnAck()
 void TcpDialog::clientReady()
 {
     char readySignal[2]={0x01,0x20};
-    tcpSocket.write(readySignal,sizeof(readySignal));
+    tcpSocket.write(readySignal,sizeof(readySignal));    
 }
 
 void TcpDialog::sendEraseData()
@@ -399,10 +440,12 @@ void TcpDialog::closeSerialPort()
     {
         serial->close();
     }
+    file.close();
+    progressNumber=0;
     plainTextEdit->insertPlainText(tr("SerialPort is closed. \n"));
     connectpushButton->setEnabled(true);
     usart_startpushButton->setEnabled(false);
-    usart_uploadpushButton->setEnabled(false);
+   // usart_uploadpushButton->setEnabled(false);
     browsepushButton->setEnabled(false);
 }
 
@@ -430,11 +473,13 @@ void TcpDialog::uploadFile()
     switch (progressNumber) {
     case 0:
         enterBootloader();
-        plainTextEdit->insertPlainText("fuck");
+        usart_uploadpushButton->setEnabled(false);
+        plainTextEdit->insertPlainText("begin to upload ... ... \n");
         progressNumber++;
         break;
     case 1:
         eraseChip();
+        plainTextEdit->insertPlainText("Erasing chip ... ... \n");
         progressNumber++;
         break;
     case 2:
@@ -443,21 +488,27 @@ void TcpDialog::uploadFile()
         {
             multiProgData();
             times++;
-            if((times%500)==0)
+            if((times%5)==0)
             {
-                plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*252.0/1024.0));
+                progressBar->setValue(times*252>>10);
+               // plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*252.0/1024.0));
             }
-
         }
-        else
-        {
-          plainTextEdit->insertPlainText(tr("finish to MultiProgram , you can do start Application \n"));
-          usart_startpushButton->setEnabled(true);
-          progressNumber++;
-        }
-
+       break;
+    case 3:
+        startApplication();
+        plainTextEdit->insertPlainText(tr("start Application ... ... \n"));
+        progressNumber++;
         break;
     default:
+        progressNumber=0;
+        sendFlag=0;
+        usart_uploadpushButton->setEnabled(true);
+        progressBar->hide();
+        //progressNumber is reset
+        //progressBar is hideed
+        // file is closed
+        //sendFlag is reset
         break;
     }
 }
@@ -467,13 +518,17 @@ void TcpDialog::enterBootloader()
     char Reboot_ID1[41]={0xfe,0x21,0x72,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x01,0x00,0x00,0x48,0xf0};
     char Reboot_ID0[41]={0xfe,0x21,0x45,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x00,0x00,0x00,0xd7,0xac};
     char insyncData[2]={0x21,0x20};
-    serial->write(insyncData,sizeof(insyncData));
+     serial->write(insyncData,sizeof(insyncData));
 
     serial->write(Reboot_ID0,sizeof(Reboot_ID0));
     serial->write(Reboot_ID1,sizeof(Reboot_ID1));
     QThread::msleep(1500);
     serial->readAll();       //clear the receive buffer.
     serial->write(insyncData,sizeof(insyncData));
+
+    progressBar->setMaximum(file.size()>>10);
+    progressBar->setValue(0);
+    progressBar->show();
 }
 
 void TcpDialog::eraseChip()
@@ -496,6 +551,9 @@ void TcpDialog::multiProgData()
         {
             sendFlag=1;
             file.close();
+            progressBar->hide();
+            plainTextEdit->insertPlainText(tr("finish to MultiProgram ... ... \n"));
+            progressNumber++;
         }
         serial->write(binArray,length+3);
 }
@@ -507,9 +565,11 @@ void TcpDialog::readSerialData()
     //plainTextEdit->insertPlainText(QString(serialReceiveData));
     if((serialBuf[0]==0x12)&&(serialBuf[1]==0x10))
     {
-        plainTextEdit->insertPlainText("send data OK \n");
+       // plainTextEdit->insertPlainText("send data OK \n");
         emit gotSerialData();
     }
     else
-    {}
+    {
+        plainTextEdit->insertPlainText(serialReceiveData.toHex());
+    }
 }
