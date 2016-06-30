@@ -138,12 +138,12 @@ void TcpDialog::connectToServer()
 {
 	if((!iplineEdit->text().isEmpty())&&(!portlineEdit->text().isEmpty())) {    //如果iplineEdit和portlineEdit非空
 		QString ipAdress = iplineEdit->text();                //得到ip地址
-		 quint64 port = portlineEdit->text().toInt();        //得到端口号
-		tcpSocket.connectToHost(ipAdress,port);          //尝试连接到对应的IP和端口
+         quint64 port = portlineEdit->text().toInt();      //得到端口号
+        tcpSocket.connectToHost(ipAdress,port);        //尝试连接到对应的IP和端口
 		connectpushButton->setEnabled(false);          //失能connect按钮，失能unconnect按钮
 		unconnectpushButton->setEnabled(true);
 		plainTextEdit->insertPlainText(tr("connecting ......\n"));
-		progressBar->setValue(0);                                   //是进度条动态显示
+        progressBar->setValue(0);                                 //是进度条动态显示
 		progressBar->show();
 	} else {                                                                     //如果ip和port有一个为空，则弹出提示
 		QMessageBox::warning(this,tr("warning"),tr("Please input the Server IP Adress and Port..."));
@@ -156,7 +156,7 @@ void TcpDialog::connectedToServer()
     QString ipAdress = tcpSocket.peerAddress().toString();    //将服务器的IP和端口号显示出来
     quint64 port = tcpSocket.peerPort();
     erasepushButton->setEnabled(true);                                //使能erase按钮
-    browsepushButton->setEnabled(true);                             //使能browse按钮
+    browsepushButton->setEnabled(true);                            //使能browse按钮
     plainTextEdit->insertPlainText(tr("connected to Host \nIP: %1 ,Port:  %2 \n").arg(ipAdress).arg(port));
     progressBar->hide();
 }
@@ -173,9 +173,9 @@ void TcpDialog::disconnectedToServer()
 //该成员函数是关闭连接
 void TcpDialog::closeConnection()
 {
-	tcpSocket.flush();                                               //清除网络缓存
-	file.close();                                                         //关闭文件
-	connectpushButton->setEnabled(true);         //使能、失能一部分按钮
+    tcpSocket.flush();                                                 //清除网络缓存
+    file.close();                                                           //关闭文件
+    connectpushButton->setEnabled(true);          //使能、失能一部分按钮
 	unconnectpushButton->setEnabled(false);
 	browsepushButton->setEnabled(false);
 	erasepushButton->setEnabled(false);
@@ -251,34 +251,34 @@ void TcpDialog::readFromServer()
 	progressBar->show();
 	if((echo[0]==0x31)&&(echo[1]==0x01)) {                            //数据请求：0x31+0x01 (可自定义)
 		if(sendFlag==0) {
-			for(quint8 i=0;i<5;i++) {                  //重复发送五次，每次2+252字节
-				readFile();                                    //读取文件，填充发送数组，发送
-				if(sendFlag==1) break;              //读取到文件末尾，跳出循环，不再发送
+            for(quint8 i=0;i<5;i++) {                                               //重复发送五次，每次2+252字节
+                readFile();                                                                 //读取文件，填充发送数组，发送
+                if(sendFlag==1) break;                                            //读取到文件末尾，跳出循环，不再发送
 			}
 			times++;
-			if(times%100==0) {                         //5*252=1260=1.2kb   故大约120KB显示一次
+            if(times%100==0) {                                                       //5*252=1260=1.2kb   故大约120KB显示一次
 				plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*5*252.0/1024.0));
 			}
 			progressBar->setValue(times*5*252>>10);                //使进度条同步
-		} else if(sendFlag==1) {                      //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
+        } else if(sendFlag==1) {                                                      //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
 			// return;
 		}
-	} else if((echo[0]==0x31)&&(echo[1]==0x02)) {                    // 芯片擦除请求: 0x31+0x02(可自定义)
+    } else if((echo[0]==0x31)&&(echo[1]==0x02)) {                   // 芯片擦除请求: 0x31+0x02(可自定义)
 		plainTextEdit->insertPlainText("got the 0x31 and 0x02 \n");
 		plainTextEdit->insertPlainText("return the Ack  \n");
-		emit sendAckToServer();                  //发射回复信号，该信号连接至槽函数returnAck
-																		//此处添加可添加一个确认对话框
+        emit sendAckToServer();                                                   //发射回复信号，该信号连接至槽函数returnAck
+                                                                                                    //此处添加可添加一个确认对话框
 	} else if((echo[0]==0x31)&&(echo[1]==0x03)) {                   //ESP已经做好接受bin文件数据的准备:0x31+0x03(可自定义)
 		plainTextEdit->insertPlainText("got the 0x31 and 0x03 \n");
 		plainTextEdit->insertPlainText("return the Ack  \n");
 		emit sendAckToServer();
 	} else if((echo[0]==0x31)&&(echo[1]==0x04)) {                  //结束命令：0x31+0x04(可自定义)
-		returnAck();                                           //直接调用槽函数，返回回复信号 0x12+0x10
+        returnAck();                                                                       //直接调用槽函数，返回回复信号 0x12+0x10
 		plainTextEdit->insertPlainText("got the 0x31 and 0x04 \n");
 		plainTextEdit->insertPlainText("Everything is OK \n");
-		closeConnection();                                //整个过程结束，需要关闭及清理相应东西
+        closeConnection();                                                           //整个过程结束，需要关闭及清理相应东西
 		progressBar->hide();
-	} else {                                                      //如果是异常数据，显示出来
+    } else {                                                                                   //如果是异常数据，显示出来
 		plainTextEdit->insertPlainText(QByteArray(echo).toHex());
 		plainTextEdit->appendPlainText(tr("\n"));
 	}
@@ -294,7 +294,7 @@ void TcpDialog::returnAck()
 //该成员函数与已打开文件信号对应，发送执行upload流程命令
 void TcpDialog::clientReady()
 {
-    char readySignal[2]={0x01,0x20};                         //如果接收的数据为0x01+0x20，执行upload流程
+    char readySignal[2]={0x01,0x20};                                   //如果接收的数据为0x01+0x20，执行upload流程
     tcpSocket.write(readySignal,sizeof(readySignal));    
 }
 
@@ -304,7 +304,7 @@ void TcpDialog::sendEraseData()
 	//TO DO
 	//there should be sending the customed erase signal
 	//and  you should match the signal in the firmware of ESP8266
-	char eraseSignal[2]={0x02,0x20};                      //如果接收的数据为0x02+0x20，执行erase流程
+    char eraseSignal[2]={0x02,0x20};                                  //如果接收的数据为0x02+0x20，执行erase流程
 	tcpSocket.write(eraseSignal,sizeof(eraseSignal));
 	//TO DO
 }
@@ -320,16 +320,16 @@ void TcpDialog::fillPortsParameters()
 	baudRatecomboBox->addItem(QStringLiteral("9600"), QSerialPort::Baud9600);
 	baudRatecomboBox->addItem(QStringLiteral("57600"),QSerialPort::Baud57600);
 	baudRatecomboBox->addItem(QStringLiteral("115200"),QSerialPort::Baud115200);
-	baudRatecomboBox->addItem(tr("Custom"));                                                       //波特率：当前9600
+    baudRatecomboBox->addItem(tr("Custom"));                                                         //波特率：当前9600
 
 	stopBitscomboBox->addItem(QStringLiteral("1"),QSerialPort::OneStop);            //停止位：当前1位停止位
 	stopBitscomboBox->addItem(QStringLiteral("2"),QSerialPort::TwoStop);
 
-	dataBitscomboBox->addItem(QStringLiteral("7"),QSerialPort::Data7);                 //数据位
+    dataBitscomboBox->addItem(QStringLiteral("7"),QSerialPort::Data7);                //数据位
 	dataBitscomboBox->addItem(QStringLiteral("8"),QSerialPort::Data8);
 	dataBitscomboBox->setCurrentIndex(1);                                                                //设置当前显示index1 的数，即8位数据位
 
-	paritycomboBox->addItem(QStringLiteral("Even"),QSerialPort::EvenParity);       //校验位：当前无校验位
+    paritycomboBox->addItem(QStringLiteral("Even"),QSerialPort::EvenParity);      //校验位：当前无校验位
 	paritycomboBox->addItem(QStringLiteral("Odd"),QSerialPort::OddParity);
 	paritycomboBox->addItem(QStringLiteral("None"),QSerialPort::NoParity);
 	paritycomboBox->setCurrentIndex(2);
@@ -340,16 +340,16 @@ void TcpDialog::fillPortsNames()
 {
 	foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts()) {       //搜索当前可获得的串口，并将串口信息赋予QSerialPortInfo对象
 		QStringList list;
-		list << info.portName();                                                                                     //将串口名赋予list
+        list << info.portName();                                                                                      //将串口名赋予list
 		serialPortcomboBox->addItem(list.first(),list);                                                 //把list添加至串口端口选择框
 	}
-	serialPortcomboBox->addItem(tr("Custom"));                                                      //增加自定义选项
+    serialPortcomboBox->addItem(tr("Custom"));                                                     //增加自定义选项
 }
 
 //该成员函数是更新串口端口
 void TcpDialog::refreshSerialPorts()
 {
-	serialPortcomboBox->clear();                    //把原有的串口信息清理，重新搜索并填充至选择框中
+    serialPortcomboBox->clear();                                                                               //把原有的串口信息清理，重新搜索并填充至选择框中
 	foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts()) {
 		QStringList list;
 		list << info.portName()  ;
@@ -361,8 +361,8 @@ void TcpDialog::refreshSerialPorts()
 //该成员函数是提取各参数选择框中的参数，并启动串口
 void TcpDialog::startSerialPort()
 {
-	Settings p ;                                                               //初始化一个结构体p
-	p.name = serialPortcomboBox->currentText();      //将参数选择框中的参数赋予结构体P
+    Settings p ;                                                                      //初始化一个结构体p
+    p.name = serialPortcomboBox->currentText();          //将参数选择框中的参数赋予结构体P
 	p.baudRate = static_cast<QSerialPort::BaudRate>(
 		 baudRatecomboBox->itemData( baudRatecomboBox->currentIndex()).toInt());
 	p.stringBaudRate = QString::number(p.baudRate);
@@ -376,17 +376,17 @@ void TcpDialog::startSerialPort()
 		paritycomboBox->itemData(paritycomboBox->currentIndex()).toInt());
 	p.stringParity = paritycomboBox->currentText();
 
-	serial->setPortName(p.name);                            //通过结构体P给串口设置参数
+    serial->setPortName(p.name);                                   //通过结构体P给串口设置参数
 	serial->setBaudRate(p.baudRate);
 	serial->setDataBits(p.dataBits);
 	serial->setParity(p.parity);
 	serial->setStopBits(p.stopBits);
 	serial->setFlowControl(QSerialPort::NoFlowControl);
-	if (serial->open(QIODevice::ReadWrite)) {      //开启串口，如果打开成功，将串口参数：波特率，数据位，校验位，停止位打印出来
+    if (serial->open(QIODevice::ReadWrite)) {               //开启串口，如果打开成功，将串口参数：波特率，数据位，校验位，停止位打印出来
 		 plainTextEdit->insertPlainText(tr("Connected to %1 : %2, %3, %4, %5")
 						  .arg(p.name).arg(p.stringBaudRate).arg(p.stringDataBits)
 						  .arg(p.stringParity).arg(p.stringStopBits));
-	} else {                                                            //如果打开串口失败，则打印出错误信息
+    } else {                                                                       //如果打开串口失败，则打印出错误信息
 		QMessageBox::critical(this, tr("Error"), serial->errorString());
 	}
 	browsepushButton->setEnabled(true);
@@ -396,11 +396,11 @@ void TcpDialog::startSerialPort()
 //该成员函数是关闭串口
 void TcpDialog::closeSerialPort()
 {
-	if(serial->isOpen()) {                       //如果串口是打开的，则关闭串口
+    if(serial->isOpen()) {                                              //如果串口是打开的，则关闭串口
 		serial->close();
 	}
-	file.close();                                      //关闭文件
-	progressNumber=0;                      //此变量控制文件上载进行到哪里，在uploadFile函数中使用
+    file.close();                                                             //关闭文件
+    progressNumber=0;                                             //此变量控制文件上载进行到哪里，在uploadFile函数中使用
 	plainTextEdit->insertPlainText(tr("SerialPort is closed. \n"));
 	connectpushButton->setEnabled(true);
 	usart_startpushButton->setEnabled(false);
@@ -410,7 +410,7 @@ void TcpDialog::closeSerialPort()
 //该成员函数是控制串口开关的按钮响应函数
 void TcpDialog::toggleSerialPort()
 {
-	if(openradioButton->isChecked()) {    //如果openradioButton按下，则开启串口，相反关闭串口
+    if(openradioButton->isChecked()) {                   //如果openradioButton按下，则开启串口，相反关闭串口
 		startSerialPort();
 	} else {
 		closeSerialPort();
@@ -440,31 +440,31 @@ void TcpDialog::uploadFile()
 {
 	switch (progressNumber) {              //判断progressNumber，进入相应的阶段
 	case 0:                                                //progressNumber：0   发送同步信号，请求同步
-		enterBootloader();                          //此处需要为使从firmware跳转至bootloader，先发送两条跳转指令
+        enterBootloader();                        //此处需要为使从firmware跳转至bootloader，先发送两条跳转指令
 		usart_uploadpushButton->setEnabled(false);
 		plainTextEdit->insertPlainText("begin to upload ... ... \n");
-		progressNumber++;                       //progressNumber++，以使进入下一阶段
+        progressNumber++;                     //progressNumber++，以使进入下一阶段
 		break;
-	case 1:                                               //progressNumber：1   发送擦除信号
+    case 1:                                               //progressNumber：1   发送擦除信号
 		eraseChip();
 		plainTextEdit->insertPlainText("Erasing chip ... ... \n");
-		progressNumber++;
+        progressNumber++;                    //progressNumber++，以使进入下一阶段
 		break;
 	case 2:                                              //progressNumber：2    循环发送bin文件数据
-		if(sendFlag==0) {
-			multiProgData();
+        if(sendFlag==0) {                         //如果发送标志位为0 ，则读取文件，选择发送
+            multiProgData();                     //读取文件，并直接发送
 			times++;
-			if((times%5)==0) {
+            if((times%5)==0) {                  //每1.2KB左右更新一下进度条
 				progressBar->setValue(times*252>>10);
 			}
 		}
 	   break;
 	case 3:                                            //progressNumber：3   发送Reboot信号
-		startApplication();
+        startApplication();                     //发送重启信号：0x30+0x20
 		plainTextEdit->insertPlainText(tr("start Application ... ... \n"));
-		progressNumber++;
+        progressNumber++;                //progressNumber++，以使进入下一阶段
 		break;
-	default:                                       //更新完成，重置progressNumber，及其他相关变量
+    default:                                         //更新完成，重置progressNumber，及其他相关变量
 		progressNumber=0;
 		sendFlag=0;
 		usart_uploadpushButton->setEnabled(true);
@@ -473,63 +473,60 @@ void TcpDialog::uploadFile()
 	}
 }
 
+//该成员函数是使飞控跳转至Bootloader并取得同步
 void TcpDialog::enterBootloader()
 {
-    char Reboot_ID1[41]={0xfe,0x21,0x72,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x01,0x00,0x00,0x48,0xf0};
-    char Reboot_ID0[41]={0xfe,0x21,0x45,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x00,0x00,0x00,0xd7,0xac};
-    char insyncData[2]={0x21,0x20};
-     serial->write(insyncData,sizeof(insyncData));
+	char Reboot_ID1[41]={0xfe,0x21,0x72,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x01,0x00,0x00,0x48,0xf0};
+	char Reboot_ID0[41]={0xfe,0x21,0x45,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x00,0x00,0x00,0xd7,0xac};
+	char insyncData[2]={0x21,0x20};
+	 serial->write(insyncData,sizeof(insyncData));         //提前发送一次同步信号，为避免一些怪异的问题
 
-    serial->write(Reboot_ID0,sizeof(Reboot_ID0));
-    serial->write(Reboot_ID1,sizeof(Reboot_ID1));
-    QThread::msleep(1500);
-    serial->readAll();       //clear the receive buffer.
-    serial->write(insyncData,sizeof(insyncData));
+	serial->write(Reboot_ID0,sizeof(Reboot_ID0));
+	serial->write(Reboot_ID1,sizeof(Reboot_ID1));
+	QThread::msleep(1500);                                            //等待1.5秒主要是飞控从Firmware跳转至bootloader需要一定时间
+	serial->readAll();                                                        //待到飞控跳转至bootloader，清空串口接收缓存
+	serial->write(insyncData,sizeof(insyncData));         //发送同步信号
 
-    progressBar->setMaximum(file.size()>>10);
-    progressBar->setValue(0);
-    progressBar->show();
+	progressBar->setMaximum(file.size()>>10);
+	progressBar->setValue(0);
+	progressBar->show();
 }
 
+//该成员函数是发送擦除信号：0x23+0x20
 void TcpDialog::eraseChip()
 {
-    char eraseData[2]={0x23,0x20};
-    serial->write(eraseData,sizeof(eraseData));
+	char eraseData[2]={0x23,0x20};
+	serial->write(eraseData,sizeof(eraseData));
 }
 
+//该成员函数是读取文件，按照格式发送bin文件数据：0x27+<length>+<Data>+0x20
 void TcpDialog::multiProgData()
 {
-
-        qint64 length=0;
-        char binArray[255]={0};
-        binArray[0]=0x27;
-        binArray[1]=252;
-        length=file.read(&(binArray[2]),252);    //length must be the multiple of 4 ,
-        binArray[1]=length;
-        binArray[length+2]=0x20;
-        if((length<252)||(file.atEnd()))
-        {
-            sendFlag=1;
-            file.close();
-            progressBar->hide();
-            plainTextEdit->insertPlainText(tr("finish to MultiProgram ... ... \n"));
-            progressNumber++;
-        }
-        serial->write(binArray,length+3);
+	qint64 length=0;
+	char binArray[255]={0};
+	binArray[0]=0x27;
+	binArray[1]=252;
+    length=file.read(&(binArray[2]),252);                //欲读取252个字节，得到实际读取字节length
+    binArray[1]=length;                                             //重写数组中的长度字节
+    binArray[length+2]=0x20;                                  //结束符
+	if((length<252)||(file.atEnd())) {                        //如果是length小于252或者文件结尾了
+        sendFlag=1;                                                     //置发送标志位为1，不再发送数据
+        file.close();                                                       //关闭文件
+		progressBar->hide();
+		plainTextEdit->insertPlainText(tr("finish to MultiProgram ... ... \n"));
+		progressNumber++;                                       //文件最后一帧数据读取完成，故progressNumber++,进入下一阶段
+	}
+	serial->write(binArray,length+3);
 }
 
+//该成员函数是串口接收函数
 void TcpDialog::readSerialData()
 {
-    QByteArray serialReceiveData = serial->read(2);
-    char* serialBuf = serialReceiveData.data();
-    //plainTextEdit->insertPlainText(QString(serialReceiveData));
-    if((serialBuf[0]==0x12)&&(serialBuf[1]==0x10))
-    {
-       // plainTextEdit->insertPlainText("send data OK \n");
-        emit gotSerialData();
-    }
-    else
-    {
-        plainTextEdit->insertPlainText(serialReceiveData.toHex());
-    }
+	QByteArray serialReceiveData = serial->read(2);     //读取两个字节
+	char* serialBuf = serialReceiveData.data();
+	if((serialBuf[0]==0x12)&&(serialBuf[1]==0x10)) {      //判断回复信号
+        emit gotSerialData();                                                //发射gotSerialData信号，该信号与槽函数uploadFile连接
+	} else {
+		plainTextEdit->insertPlainText(serialReceiveData.toHex());
+	}
 }
