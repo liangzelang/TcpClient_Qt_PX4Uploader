@@ -15,37 +15,50 @@
 #include <QTabWidget>
 #include <QRadioButton>
 #include <QThread>
+#include <QProcess>
 
 TcpDialog::TcpDialog(QWidget *parent) :
     QDialog(parent)
 {
     setupUi(this);
+    process=new QProcess(this);
     serial= new QSerialPort(this);
     sendFlag=0;
     times=0;
     buttonInit();
-    progressBar->hide();    
-    iplineEdit->setText(tr("192.168.4.1"));
-    portlineEdit->setText("8086");
+    progressBar->hide();
+
     connect(browsepushButton,SIGNAL(clicked(bool)),this,SLOT(browseFile()));
+    connect(browseBLpushButton,SIGNAL(clicked(bool)),this,SLOT(browseBLFile()));
     connect(connectpushButton,SIGNAL(clicked(bool)),this,SLOT(connectToServer()));
     connect(unconnectpushButton,SIGNAL(clicked(bool)),this,SLOT(closeConnection()));
-    connect(this,SIGNAL(wifi_fileOpened()),this,SLOT(clientReady()));
+    connect(eraseBLpushButton,SIGNAL(clicked(bool)),this,SLOT(bl_eraseChip()));
+    connect(uploadBLpushButton,SIGNAL(clicked(bool)),this,SLOT(bl_uploadFile()));    
     connect(uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(wifi_openFile()));
-    connect(usart_uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(usart_openFile()));
-    connect(this,SIGNAL(usart_fileOpened()),this,SLOT(uploadFile()));
+    connect(usart_uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(usart_openFile()));    
     connect(clearpushButton,SIGNAL(clicked(bool)),this,SLOT(clearReceiveBuf()));
     connect(erasepushButton,SIGNAL(clicked(bool)),this,SLOT(sendEraseData()));
     connect(openradioButton,SIGNAL(toggled(bool)),this,SLOT(toggleSerialPort()));
     connect(refreshpushButton,SIGNAL(clicked(bool)),this,SLOT(refreshSerialPorts()));
+    connect(helppushButton,SIGNAL(clicked(bool)),this,SLOT(showHelp()));
     connect(&tcpSocket,SIGNAL(connected()),this,SLOT(connectedToServer()));
     connect(&tcpSocket,SIGNAL(readyRead()),this,SLOT(readFromServer()));
     connect(&tcpSocket,SIGNAL(disconnected()),this,SLOT(disconnectedToServer()));
     connect(&tcpSocket,SIGNAL(error(QAbstractSocket::SocketError)),this,SLOT(connectionError()));
+
     connect(serial,SIGNAL(readyRead()),this,SLOT(readSerialData()));
+
+    connect(process,SIGNAL(readyReadStandardOutput()),this,SLOT(showData()));
+    connect(process,SIGNAL(started()),this,SLOT(processStarted()));
+    connect(process,SIGNAL(error(QProcess::ProcessError)),this,SLOT(processError()));
+    connect(process,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(killProcess()));
+
     connect(this,SIGNAL(haveOpenedFile()),this,SLOT(readFile()));
     connect(this,SIGNAL(sendAckToServer()),this,SLOT(returnAck()));
     connect(this,SIGNAL(gotSerialData()),this,SLOT(uploadFile()));
+    connect(this,SIGNAL(usart_fileOpened()),this,SLOT(uploadFile()));
+    connect(this,SIGNAL(wifi_fileOpened()),this,SLOT(clientReady()));
+
     fillPortsParameters();
     fillPortsNames();
 }
@@ -56,7 +69,7 @@ TcpDialog::~TcpDialog()
 }
 
 ///////////////////////////////////////////////////////////////////////
-//                      该部分为WiFi方式下的部分函数                          //
+//                      该部分为WiFi方式下的部分函数                    //
 //////////////////////////////////////////////////////////////////////
 
 //该成员函数初始化一些按钮，按照一定逻辑，使能或失能按钮
@@ -70,6 +83,7 @@ void TcpDialog::buttonInit()
 	sendpushButton->setEnabled(false);                 //WiFi方式下的Send按钮失能，这个按钮没有使用
 	usart_startpushButton->setEnabled(false);       //USART方式下的Start Application按钮失能
 	usart_uploadpushButton->setEnabled(false);   //USART方式下upload按钮失能
+    uploadBLpushButton->setEnabled(false);         //J-Link
 }
 //该成员函数是选择上载的文件
 void TcpDialog::browseFile()
@@ -265,9 +279,16 @@ void TcpDialog::readFromServer()
 		}
     } else if((echo[0]==0x31)&&(echo[1]==0x02)) {                   // 芯片擦除请求: 0x31+0x02(可自定义)
 		plainTextEdit->insertPlainText("got the 0x31 and 0x02 \n");
-		plainTextEdit->insertPlainText("return the Ack  \n");
-        emit sendAckToServer();                                                   //发射回复信号，该信号连接至槽函数returnAck
-                                                                                                    //此处添加可添加一个确认对话框
+        plainTextEdit->insertPlainText("return the Ack  \n");
+        int choice=QMessageBox::information(this,"Confirm","Ensure to erase the chip?",QMessageBox::Yes,QMessageBox::No);
+        if(choice==QMessageBox::Yes) {
+            plainTextEdit->insertPlainText("you push the yes \n");
+            emit sendAckToServer();                                               //发射回复信号，该信号连接至槽函数returnAck
+        } else if(choice==QMessageBox::No) {
+            plainTextEdit->insertPlainText("you push the no\n");
+            emit sendAckToServer();                                               //暂时：无论你选yes或no都按找正常流程走。待逻辑定好再修改此处
+        }
+        //此处添加可添加一个确认对话框
 	} else if((echo[0]==0x31)&&(echo[1]==0x03)) {                   //ESP已经做好接受bin文件数据的准备:0x31+0x03(可自定义)
 		plainTextEdit->insertPlainText("got the 0x31 and 0x03 \n");
 		plainTextEdit->insertPlainText("return the Ack  \n");
@@ -529,4 +550,68 @@ void TcpDialog::readSerialData()
 	} else {
 		plainTextEdit->insertPlainText(serialReceiveData.toHex());
 	}
+}
+
+/*******************************************************/
+/******************     J-Link Mode        *********************/
+/*******************************************************/
+
+void TcpDialog::browseBLFile()
+{
+
+    QString bl_initialName = blBrowse_lineEdit->text();						//从lineEdit部件中得到默认的文件路径
+    if(bl_initialName.isEmpty())											//如果lineEdit部件为空，就设置home路径为默认文件路径
+        bl_initialName = QDir::homePath();
+    QString bl_fileName =QFileDialog::getOpenFileName(this,tr("choose BL file"),bl_initialName);	//在默认路径下，开启一个文件对话框，选择上载的文件
+    bl_fileName =QDir::toNativeSeparators(bl_fileName);		//根据不同系统，本地化路径的分隔符
+    blBrowse_lineEdit->setText(bl_fileName);										//将选择的文件路径填充至lineEdit以及plainTextEdit
+    plainTextEdit->insertPlainText(bl_fileName);
+    uploadBLpushButton->setEnabled(true);
+}
+
+void TcpDialog::bl_eraseChip()
+{
+    QStringList strList;
+    QString str1=blBrowse_lineEdit->text();
+    strList<<str1;
+    process->start("/home/lianzelang/hello.sh",strList,QProcess::ReadWrite);
+}
+
+void TcpDialog::showData()
+{
+    QByteArray ba=process->readAllStandardOutput();
+    plainTextEdit->insertPlainText(ba);
+}
+
+void TcpDialog::processStarted()
+{
+    plainTextEdit->insertPlainText("Script starts...\n");
+}
+
+void TcpDialog::processError()
+{
+    QByteArray ba= process->readAllStandardError();
+    plainTextEdit->insertPlainText(ba);
+}
+
+void TcpDialog::bl_uploadFile()
+{
+    QStringList strList;
+    QString fileNameStr=blBrowse_lineEdit->text();
+    QString fileAddrStr=blAddr_lineEdit->text();
+    strList<<fileNameStr<<fileAddrStr;
+    process->start("/home/liangzelang/hello.sh",strList,QProcess::ReadWrite);
+   //process->start("/home/lianzelang/hello.sh",QStringList("/home/liangzelang/hello.sh"),QProcess::ReadWrite);
+    //why the second command is invalid,  ???
+    plainTextEdit->insertPlainText("bl_upload...\n");
+}
+
+void TcpDialog::killProcess()
+{
+    process->kill();
+}
+
+void TcpDialog::showHelp()
+{
+    plainTextEdit->insertPlainText("help");
 }

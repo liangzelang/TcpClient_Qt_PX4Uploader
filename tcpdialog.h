@@ -5,7 +5,7 @@
 #include <QTcpSocket>
 #include <QFile>
 #include <QtSerialPort/QSerialPort>
-
+#include <QProcess>
 
 class TcpDialog : public QDialog ,public Ui::TcpDialog
 {
@@ -14,6 +14,7 @@ class TcpDialog : public QDialog ,public Ui::TcpDialog
 public:
     explicit TcpDialog(QWidget *parent = 0);
     ~TcpDialog();
+    //QProcess *process;
      QString fileName;
      quint8 sendFlag;
      quint64 times;
@@ -55,6 +56,7 @@ signals:
 
 private slots:
     void browseFile();
+    void browseBLFile();
     void readFile();
     void connectToServer();
     void closeConnection();
@@ -69,16 +71,23 @@ private slots:
     void sendEraseData();
     void refreshSerialPorts();
     void toggleSerialPort();
-
+    void bl_eraseChip();
+    void bl_uploadFile();
     void uploadFile();
     void readSerialData();
     void wifi_openFile();
     void usart_openFile();
+    void showData();
+    void processStarted();
+    void processError();
+    void killProcess();
+    void showHelp();
 
 private:
     QTcpSocket tcpSocket ;
     QFile file;
     QSerialPort *serial;
+    QProcess *process;
 };
 
 #endif // TCPDIALOG_H
