@@ -67,7 +67,7 @@
         <widget class="QPlainTextEdit" name="plainTextEdit">
          <property name="minimumSize">
           <size>
-           <width>257</width>
+           <width>260</width>
            <height>0</height>
           </size>
          </property>
@@ -118,6 +118,12 @@
        <property name="enabled">
         <bool>true</bool>
        </property>
+       <property name="maximumSize">
+        <size>
+         <width>220</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="font">
         <font>
          <pointsize>11</pointsize>
@@ -125,7 +131,7 @@
         </font>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="tab">
         <attribute name="title">
@@ -360,7 +366,7 @@
             </spacer>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButton">
+            <widget class="QPushButton" name="uploadusbpushButton">
              <property name="text">
               <string>Upload</string>
              </property>

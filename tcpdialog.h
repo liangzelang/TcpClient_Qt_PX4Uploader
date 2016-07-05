@@ -82,6 +82,7 @@ private slots:
     void processError();
     void killProcess();
     void showHelp();
+    void uploadusbFile();
 
 private:
     QTcpSocket tcpSocket ;
