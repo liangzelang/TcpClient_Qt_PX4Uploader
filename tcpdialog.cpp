@@ -630,8 +630,8 @@ void TcpDialog::uploadusbFile()
 	QString filePath=QStandardPaths::writableLocation(QStandardPaths::HomeLocation).append("/nuttx-px4fmu-v2-default.px4");//得到用户主文件目录，由于待上载的文件置于主文件目录，故得到上载文件路径
 	//plainTextEdit->insertPlainText(filePath);
 	QString commandStr=commandLine+execDir+deviceStr+filePath;                                           //合成命令
-	//plainTextEdit->insertPlainText(commandStr);
-	process->start(commandStr,QProcess::ReadWrite);                                                      //开启新进程，启动脚本，开始上载程序
+    plainTextEdit->insertPlainText(commandStr);
+    process->start(commandStr,QProcess::ReadWrite);                                                      //开启新进程，启动脚本，开始上载程序
 }
 
 /**********************************************/

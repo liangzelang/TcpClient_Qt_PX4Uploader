@@ -21,3 +21,4 @@ SOURCES += main.cpp\
 HEADERS  += tcpdialog.h
 
 FORMS    += tcpdialog.ui
+
