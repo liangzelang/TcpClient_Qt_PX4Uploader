@@ -15,19 +15,21 @@ public:
     explicit TcpDialog(QWidget *parent = 0);
     ~TcpDialog();
     //QProcess *process;
-     QString fileName;
-     quint8 sendFlag;
-     quint64 times;
-     quint64 progressNumber=0;
-     void fillPortsParameters();
-     void fillPortsNames();
-     void startSerialPort();
-     void closeSerialPort();
+    QString fileName;
+    quint8 sendFlag;
+    quint64 times;
+    quint64 progressNumber=0;
+    quint8 unconnect_flag;
+    void fillPortsParameters();
+    void fillPortsNames();
+    void startSerialPort();
+    void closeSerialPort();
     void enterBootloader();
     void eraseChip();
     void multiProgData();
     void buttonInit();
     void startApplication();
+    void cleanVariables();
    // void uploadFile();
 
      struct Settings {
@@ -50,9 +52,11 @@ public:
 signals:
     void haveOpenedFile();
     void sendAckToServer();
+    void sendCancelAckToServer();
     void gotSerialData();
     void wifi_fileOpened();
     void usart_fileOpened();
+    void sendUnconnectAckToServer();
 
 private slots:
     void browseFile();
@@ -60,6 +64,7 @@ private slots:
     void readFile();
     void connectToServer();
     void closeConnection();
+    void onUnconnectionClicked();
     void clearReceiveBuf();
     void connectedToServer();
     void disconnectedToServer();
@@ -83,6 +88,9 @@ private slots:
     void killProcess();
     void showHelp();
     void uploadusbFile();
+    void returnCancelAck();
+    void returnUnconnectAck();
+    void setScrollPosition();
 
 private:
     QTcpSocket tcpSocket ;
