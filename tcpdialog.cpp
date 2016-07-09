@@ -192,6 +192,21 @@ void TcpDialog::readFile()
 	tcpSocket.write(binArray,(length+2));     //发送填充好的数据帧
 }
 
+void TcpDialog::loadData(char* binArray, qint64 *length)
+{
+    binArray[0]=0x01;
+    binArray[1]=252;
+    *length=file.read(&(binArray[2]),252);     //每次欲读取252个字节，得到实际读取长度
+    binArray[1]=*length;
+    if((*length<252)||(file.atEnd())) {        //如果长度小于252，或者到了文件末尾
+        binArray[0]=0x02;                     //重写数据帧头
+        sendFlag=1;                           //置sendFlag为1，使下次数据请求无效
+        file.close();                         //关闭文件
+    }
+    *length=*length+2;
+    //tcpSocket.write(binArray,(length+2));     //发送填充好的数据帧
+}
+
 //该成员函数是根据填写的IP和端口号连接TCP服务器
 void TcpDialog::connectToServer()
 {
@@ -325,6 +340,9 @@ TCP Server(ESP8266)与TCP客户端（Qt端）通信信号定义(C代表TCP客户
 */
 void TcpDialog::readFromServer()
 {
+    char BinData[1270]={0};
+    qint64 length[5]={0};
+    quint16 lengthSum=0;
 	if(tcpSocket.bytesAvailable()==1) return;
 	QByteArray str =  tcpSocket.read(2);
 	char *echo =str.data();
@@ -358,11 +376,12 @@ void TcpDialog::readFromServer()
                 return;   //out function
             }
         #endif
-		if(sendFlag==0) {
+        /*
+		if(sendFlag==0) {            
 			for(quint8 i=0;i<5;i++) {                             //重复发送五次，每次2+252字节
 				readFile();                                       //读取文件，填充发送数组，发送
-				if(sendFlag==1) break;                            //读取到文件末尾，跳出循环，不再发送
-			}
+				if(sendFlag==1) break;                            //读取到文件末尾，跳出循环，不再发送              
+			}            
 			times++;
 			if(times%100==0) {                                    //5*252=1260=1.2kb   故大约120KB显示一次
 				plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*5*252.0/1024.0));
@@ -370,7 +389,24 @@ void TcpDialog::readFromServer()
 			progressBar->setValue(times*5*252>>10);               //使进度条同步
 		} else if(sendFlag==1) {                                  //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
 			// return;
-		}
+        }*/
+
+         if(sendFlag==0) {
+                for(quint8 i=0;i<5;i++) {                             //重复发送五次，每次2+252字节
+                    loadData(&BinData[i*254],&length[i]);                 //读取文件，填充发送数组，发送
+                    lengthSum=lengthSum+length[i];
+                    if(sendFlag==1) break;                            //读取到文件末尾，跳出循环，不再发送
+                }
+                tcpSocket.write(BinData,lengthSum);
+                tcpSocket.waitForBytesWritten();
+                times++;
+                if(times%100==0) {                                    //5*252=1260=1.2kb   故大约120KB显示一次
+                    plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*5*252.0/1024.0));
+                }
+                progressBar->setValue(times*5*252>>10);               //使进度条同步
+            } else if(sendFlag==1) {                                  //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
+                // return;
+         }
 	} else if((echo[0]==0x31)&&(echo[1]==0x02)) {                 // 芯片擦除请求: 0x31+0x02(可自定义)
         #ifdef enable_unconnect
             if(unconnect_flag==1) {

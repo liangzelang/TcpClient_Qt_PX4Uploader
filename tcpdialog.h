@@ -30,6 +30,7 @@ public:
     void buttonInit();
     void startApplication();
     void cleanVariables();
+    void loadData(char* binArray, qint64 *length);
    // void uploadFile();
 
      struct Settings {
