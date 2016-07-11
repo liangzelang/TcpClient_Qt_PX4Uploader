@@ -1,5 +1,6 @@
 #include "tcpdialog.h"
 #include "ui_tcpdialog.h"
+#include <QCloseEvent>
 #include <QDialog>
 #include <QPushButton>
 #include <QDir>
@@ -70,6 +71,7 @@ TcpDialog::TcpDialog(QWidget *parent) :
     connect(this,SIGNAL(usart_fileOpened()),this,SLOT(uploadFile()));
     connect(this,SIGNAL(wifi_fileOpened()),this,SLOT(clientReady()));
     connect(this,SIGNAL(sendUnconnectAckToServer()),this,SLOT(returnUnconnectAck()));
+    connect(this,SIGNAL(remainReadyRead()),this,SLOT(readFromServer()));
 
     fillPortsParameters();
     fillPortsNames();
@@ -78,6 +80,17 @@ TcpDialog::TcpDialog(QWidget *parent) :
 TcpDialog::~TcpDialog()
 {
 
+}
+
+void TcpDialog::closeEvent(QCloseEvent *)
+{
+    QMessageBox::information(this,"Info","You Will Close This Window");
+    if(tcpSocket.isOpen()) {
+        onUnconnectionClicked();
+        //QMessageBox::information(this,"info","the tcpSocket is connection");
+    } else {
+        //QMessageBox::information(this,"info","the tcpSocket is unconnection");
+    }
 }
 
 void TcpDialog::setScrollPosition()
@@ -152,7 +165,7 @@ void TcpDialog::wifi_openFile()
 		} else {
             erasepushButton->setEnabled(false);
             uploadpushButton->setEnabled(false);
-			plainTextEdit->insertPlainText(tr("\n this File is opened , Please go on  \n"));
+            plainTextEdit->insertPlainText(tr("\n==>>>Bin file is opened,Ready to Erase.\n"));
             //progressBar->setMaximum(file.size()>>10);   //设置进度条的最大值为文件大小
 			emit wifi_fileOpened();              //发送文件打开的信号，该信号与槽函数 clientReady（）连接。
 		}
@@ -167,7 +180,7 @@ void TcpDialog::usart_openFile()
 		if(!file.open(QIODevice::ReadOnly)) {
 			qDebug()<<"can't open the file!"<<endl;
 		} else {
-			plainTextEdit->insertPlainText(tr("\n this File is opened , Please go on  \n"));
+            plainTextEdit->insertPlainText(tr("\n==>>>Bin file is opened,Ready to Erase.\n"));
 			progressBar->setMaximum(file.size()>>10);
 			emit usart_fileOpened();           //发射文件打开的信号，该信号与槽函数 uploadFile()连接
 		}
@@ -218,7 +231,7 @@ void TcpDialog::connectToServer()
 		tcpSocket.connectToHost(ipAdress,port);        //尝试连接到对应的IP和端口
 		connectpushButton->setEnabled(false);          //失能connect按钮，失能unconnect按钮
 		unconnectpushButton->setEnabled(true);
-		plainTextEdit->insertPlainText(tr("connecting ......\n"));
+        plainTextEdit->insertPlainText(tr("==>>>connecting ......\n"));
         progressBar->setMaximum(0);
         //progressBar->setValue(0);                      //是进度条动态显示
 		progressBar->show();
@@ -236,7 +249,7 @@ void TcpDialog::connectedToServer()
 	browsepushButton->setEnabled(true);       //使能browse按钮
     if(!lineEdit->text().isEmpty())
         uploadpushButton->setEnabled(true);
-	plainTextEdit->insertPlainText(tr("connected to Host \nIP: %1 ,Port:  %2 \n").arg(ipAdress).arg(port));
+    plainTextEdit->insertPlainText(tr("==>>>connected to Host, IP: %1 ,Port:  %2 \n\n").arg(ipAdress).arg(port));
 	progressBar->hide();
 }
 
@@ -244,7 +257,7 @@ void TcpDialog::connectedToServer()
 void TcpDialog::disconnectedToServer()
 {
 	tcpSocket.close();                        //关闭连接
-	plainTextEdit->insertPlainText(tr("Disconnected from host......\n"));
+    plainTextEdit->insertPlainText(tr("\n==>>>Disconnected from host......\n"));
 	connectpushButton->setEnabled(true);      //使能connect按钮
 	unconnectpushButton->setEnabled(false);   //失能unconnect按钮
     erasepushButton->setEnabled(false);       //disable erasepushButton
@@ -267,6 +280,7 @@ void TcpDialog::onUnconnectionClicked()
         return;
     }
     returnUnconnectAck();
+    tcpSocket.waitForBytesWritten();
     unconnectpushButton->setEnabled(false);
 }
 
@@ -285,7 +299,7 @@ void TcpDialog::closeConnection()
     tcpSocket.close();                       //关闭TCP连接
     tcpSocket.abort();                       //取消已有连接，重置套接字
 	progressBar->hide();
-    plainTextEdit->insertPlainText(tr("close the current Tcp connection. \n"));
+    plainTextEdit->insertPlainText(tr("\n==>>> close the current Tcp connection. \n"));
 }
 
 void TcpDialog::cleanVariables()
@@ -300,7 +314,7 @@ void TcpDialog::cleanVariables()
     sendFlag=0;                              //清理一些变量
     times=0;
     progressBar->hide();
-    plainTextEdit->insertPlainText(tr("Mission completed. \n"));
+    plainTextEdit->insertPlainText(tr("\n==>>> Everything is OK ,Mission completed. \n"));
 }
 
 //该成员函数是清理plainTextEdit
@@ -340,11 +354,18 @@ TCP Server(ESP8266)与TCP客户端（Qt端）通信信号定义(C代表TCP客户
 */
 void TcpDialog::readFromServer()
 {
-    char BinData[1270]={0};
-    qint64 length[5]={0};
+    char BinData[2540]={0};
+    qint64 length[10]={0};
     quint16 lengthSum=0;
-	if(tcpSocket.bytesAvailable()==1) return;
+    if(tcpSocket.bytesAvailable()==1) {
+        //plainTextEdit->insertPlainText("\n got only one.");
+        return;
+    }
 	QByteArray str =  tcpSocket.read(2);
+    if(tcpSocket.bytesAvailable()>=1) {
+        emit remainReadyRead();
+    }
+    //plainTextEdit->insertPlainText("\n got TWO.");
 	char *echo =str.data();
 	//QByteArray str =  tcpSocket.read(2);
 	//above is OK ,however it can't work at some situation
@@ -392,7 +413,7 @@ void TcpDialog::readFromServer()
         }*/
 
          if(sendFlag==0) {
-                for(quint8 i=0;i<5;i++) {                             //重复发送五次，每次2+252字节
+                for(quint8 i=0;i<10;i++) {                             //重复发送五次，每次2+252字节
                     loadData(&BinData[i*254],&length[i]);                 //读取文件，填充发送数组，发送
                     lengthSum=lengthSum+length[i];
                     if(sendFlag==1) break;                            //读取到文件末尾，跳出循环，不再发送
@@ -400,10 +421,10 @@ void TcpDialog::readFromServer()
                 tcpSocket.write(BinData,lengthSum);
                 tcpSocket.waitForBytesWritten();
                 times++;
-                if(times%100==0) {                                    //5*252=1260=1.2kb   故大约120KB显示一次
-                    plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*5*252.0/1024.0));
+                if(times%50==0) {                                    //5*252=1260=1.2kb  20*254*25 故大约120KB显示一次
+                    plainTextEdit->insertPlainText(QString("==>>> send :   %1  KB \n").arg(times*10*252.0/1024.0));
                 }
-                progressBar->setValue(times*5*252>>10);               //使进度条同步
+                progressBar->setValue(times*10*252>>10);               //使进度条同步
             } else if(sendFlag==1) {                                  //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
                 // return;
          }
@@ -415,15 +436,14 @@ void TcpDialog::readFromServer()
                 return;   //out function
             }
         #endif
-		plainTextEdit->insertPlainText("got the 0x31 and 0x02 \n");
-		plainTextEdit->insertPlainText("return the Ack  \n");
+        plainTextEdit->insertPlainText("\n==>>> Got the erase request \n");
 		int choice=QMessageBox::information(this,"Confirm","Ensure to erase the chip?",QMessageBox::Yes,QMessageBox::No);
 		if(choice==QMessageBox::Yes) {
-			plainTextEdit->insertPlainText("you push the yes \n");
+            plainTextEdit->insertPlainText("==>>> Begin to Erase... \n");
             progressBar->show();    //erase progressbar show
 			emit sendAckToServer();                              //发射回复信号，该信号连接至槽函数returnAck
 		} else if(choice==QMessageBox::No) {
-			plainTextEdit->insertPlainText("you push the no\n");
+            plainTextEdit->insertPlainText("==>>> Cancel to Erase... \n");
 
             tcpSocket.flush();                        //清除网络缓存
             file.close();                             //关闭文件
@@ -446,8 +466,7 @@ void TcpDialog::readFromServer()
                 return;   //out function
             }
         #endif
-        plainTextEdit->insertPlainText("got the 0x31 and 0x03 \n");
-		plainTextEdit->insertPlainText("return the Ack  \n");
+        plainTextEdit->insertPlainText("\n==>>> Got the Ready Request \n");
         progressBar->hide();    //erase progressbar hide
         progressBar->setMaximum(file.size()>>10);   //设置进度条的最大值为文件大小
         progressBar->setValue(0);
@@ -462,8 +481,8 @@ void TcpDialog::readFromServer()
             }
         #endif
         returnAck();                                             //直接调用槽函数，返回回复信号 0x12+0x10
-		plainTextEdit->insertPlainText("got the 0x31 and 0x04 \n");
-		plainTextEdit->insertPlainText("Everything is OK \n");
+
+        plainTextEdit->insertPlainText("\n==>>> Got the Finished request \n");
         cleanVariables();
         //closeConnection();                                       //整个过程结束，需要关闭及清理相应东西
 		progressBar->hide();

@@ -58,6 +58,7 @@ signals:
     void wifi_fileOpened();
     void usart_fileOpened();
     void sendUnconnectAckToServer();
+    void remainReadyRead();
 
 private slots:
     void browseFile();
@@ -92,7 +93,8 @@ private slots:
     void returnCancelAck();
     void returnUnconnectAck();
     void setScrollPosition();
-
+protected:
+    void closeEvent(QCloseEvent *);
 private:
     QTcpSocket tcpSocket ;
     QFile file;
