@@ -23,58 +23,54 @@
 TcpDialog::TcpDialog(QWidget *parent) :
     QDialog(parent)
 {
-    setupUi(this);
-    process=new QProcess(this);
-    serial= new QSerialPort(this);
-    sendFlag=0;
-    unconnect_flag=0;
-    times=0;
-    buttonInit();
-    progressBar->hide();
-    //plainTextEdit->moveCursor(QTextCursor::End);
-    connect(plainTextEdit,SIGNAL(textChanged()),this,SLOT(setScrollPosition()));
-    connect(browsepushButton,SIGNAL(clicked(bool)),this,SLOT(browseFile()));
-    connect(browseBLpushButton,SIGNAL(clicked(bool)),this,SLOT(browseBLFile()));
-    connect(connectpushButton,SIGNAL(clicked(bool)),this,SLOT(connectToServer()));
+	setupUi(this);
+	process=new QProcess(this);
+	serial= new QSerialPort(this);
+	sendFlag=0;
+	unconnect_flag=0;
+	times=0;
+	buttonInit();
+	progressBar->hide();
+	connect(plainTextEdit,SIGNAL(textChanged()),this,SLOT(setScrollPosition()));
+	connect(browsepushButton,SIGNAL(clicked(bool)),this,SLOT(browseFile()));
+	connect(browseBLpushButton,SIGNAL(clicked(bool)),this,SLOT(browseBLFile()));
+	connect(connectpushButton,SIGNAL(clicked(bool)),this,SLOT(connectToServer()));
+	connect(unconnectpushButton,SIGNAL(clicked(bool)),this,SLOT(onUnconnectionClicked()));
+	connect(eraseBLpushButton,SIGNAL(clicked(bool)),this,SLOT(bl_eraseChip()));
+	connect(uploadBLpushButton,SIGNAL(clicked(bool)),this,SLOT(bl_uploadFile()));
+	connect(uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(wifi_openFile()));
+	connect(usart_uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(usart_openFile()));
+	connect(clearpushButton,SIGNAL(clicked(bool)),this,SLOT(clearReceiveBuf()));
+	connect(erasepushButton,SIGNAL(clicked(bool)),this,SLOT(sendEraseData()));
+	connect(openradioButton,SIGNAL(toggled(bool)),this,SLOT(toggleSerialPort()));
+	connect(refreshpushButton,SIGNAL(clicked(bool)),this,SLOT(refreshSerialPorts()));
+	connect(helppushButton,SIGNAL(clicked(bool)),this,SLOT(showHelp()));
+	connect(uploadusbpushButton,SIGNAL(clicked(bool)),this,SLOT(uploadusbFile()));
 
-    //connect(unconnectpushButton,SIGNAL(clicked(bool)),this,SLOT(closeConnection()));
-    connect(unconnectpushButton,SIGNAL(clicked(bool)),this,SLOT(onUnconnectionClicked()));
+	connect(&tcpSocket,SIGNAL(connected()),this,SLOT(connectedToServer()));
+	connect(&tcpSocket,SIGNAL(readyRead()),this,SLOT(readFromServer()));
+	connect(&tcpSocket,SIGNAL(disconnected()),this,SLOT(disconnectedToServer()));
+	connect(&tcpSocket,SIGNAL(error(QAbstractSocket::SocketError)),this,SLOT(connectionError()));
 
-    connect(eraseBLpushButton,SIGNAL(clicked(bool)),this,SLOT(bl_eraseChip()));
-    connect(uploadBLpushButton,SIGNAL(clicked(bool)),this,SLOT(bl_uploadFile()));    
-    connect(uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(wifi_openFile()));
-    connect(usart_uploadpushButton,SIGNAL(clicked(bool)),this,SLOT(usart_openFile()));    
-    connect(clearpushButton,SIGNAL(clicked(bool)),this,SLOT(clearReceiveBuf()));
-    connect(erasepushButton,SIGNAL(clicked(bool)),this,SLOT(sendEraseData()));
-    connect(openradioButton,SIGNAL(toggled(bool)),this,SLOT(toggleSerialPort()));
-    connect(refreshpushButton,SIGNAL(clicked(bool)),this,SLOT(refreshSerialPorts()));
-    connect(helppushButton,SIGNAL(clicked(bool)),this,SLOT(showHelp()));
-    connect(uploadusbpushButton,SIGNAL(clicked(bool)),this,SLOT(uploadusbFile()));
+	connect(serial,SIGNAL(readyRead()),this,SLOT(readSerialData()));
 
-    connect(&tcpSocket,SIGNAL(connected()),this,SLOT(connectedToServer()));
-    connect(&tcpSocket,SIGNAL(readyRead()),this,SLOT(readFromServer()));
-    connect(&tcpSocket,SIGNAL(disconnected()),this,SLOT(disconnectedToServer()));
-    connect(&tcpSocket,SIGNAL(error(QAbstractSocket::SocketError)),this,SLOT(connectionError()));
+	connect(process,SIGNAL(readyReadStandardOutput()),this,SLOT(showData()));
+	connect(process,SIGNAL(started()),this,SLOT(processStarted()));
+	connect(process,SIGNAL(error(QProcess::ProcessError)),this,SLOT(processError()));
+	connect(process,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(killProcess()));
+	connect(process,SIGNAL(readyReadStandardError()),this,SLOT(processError()));
 
-    connect(serial,SIGNAL(readyRead()),this,SLOT(readSerialData()));
+	connect(this,SIGNAL(haveOpenedFile()),this,SLOT(readFile()));
+	connect(this,SIGNAL(sendAckToServer()),this,SLOT(returnAck()));
+	connect(this,SIGNAL(sendCancelAckToServer()),this,SLOT(returnCancelAck()));
+	connect(this,SIGNAL(gotSerialData()),this,SLOT(uploadFile()));
+	connect(this,SIGNAL(usart_fileOpened()),this,SLOT(uploadFile()));
+	connect(this,SIGNAL(wifi_fileOpened()),this,SLOT(clientReady()));
+	connect(this,SIGNAL(sendUnconnectAckToServer()),this,SLOT(returnUnconnectAck()));
+	connect(this,SIGNAL(remainReadyRead()),this,SLOT(readFromServer()));
 
-    connect(process,SIGNAL(readyReadStandardOutput()),this,SLOT(showData()));
-    connect(process,SIGNAL(started()),this,SLOT(processStarted()));
-    connect(process,SIGNAL(error(QProcess::ProcessError)),this,SLOT(processError()));
-    connect(process,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(killProcess()));
-    connect(process,SIGNAL(readyReadStandardError()),this,SLOT(processError()));
-
-    connect(this,SIGNAL(haveOpenedFile()),this,SLOT(readFile()));
-    connect(this,SIGNAL(sendAckToServer()),this,SLOT(returnAck()));
-    connect(this,SIGNAL(sendCancelAckToServer()),this,SLOT(returnCancelAck()));
-    connect(this,SIGNAL(gotSerialData()),this,SLOT(uploadFile()));
-    connect(this,SIGNAL(usart_fileOpened()),this,SLOT(uploadFile()));
-    connect(this,SIGNAL(wifi_fileOpened()),this,SLOT(clientReady()));
-    connect(this,SIGNAL(sendUnconnectAckToServer()),this,SLOT(returnUnconnectAck()));
-    connect(this,SIGNAL(remainReadyRead()),this,SLOT(readFromServer()));
-
-    fillPortsParameters();
-    fillPortsNames();
+	fillPortsParameters();
+	fillPortsNames();
 }
 
 TcpDialog::~TcpDialog()
@@ -84,13 +80,13 @@ TcpDialog::~TcpDialog()
 
 void TcpDialog::closeEvent(QCloseEvent *)
 {
-    QMessageBox::information(this,"Info","You Will Close This Window");
-    if(tcpSocket.isOpen()) {
-        onUnconnectionClicked();
-        //QMessageBox::information(this,"info","the tcpSocket is connection");
-    } else {
-        //QMessageBox::information(this,"info","the tcpSocket is unconnection");
-    }
+	QMessageBox::information(this,"Info","You Will Close This Window");
+	if(tcpSocket.isOpen()) {
+		onUnconnectionClicked();
+		//QMessageBox::information(this,"info","the tcpSocket is connection");
+	} else {
+		//QMessageBox::information(this,"info","the tcpSocket is unconnection");
+	}
 }
 
 void TcpDialog::setScrollPosition()
@@ -101,27 +97,27 @@ void TcpDialog::setScrollPosition()
 //该成员函数是整个软件使用方法的说明
 void TcpDialog::showHelp()
 {
-    QString wifiStr="##WiFi 模式##\n"
-                    "1、填写TCP服务器的IP地址以及对应端口号（默认已设置好），然后连接。\n "
-                    "2、点击Browse选择上载的文件，点击Upload就可以开始烧写。\n"
-                    "3、连接上后也可以直接选择擦除芯片，点击Erase Chip。\n\n";
-    QString usartStr="##串口模式##\n"
-                     "1、分别选择串口的配置参数，再打开串口\n"
-                     "2、如果串口号列表中没有对应的串口，点击Refresh Serial Port更新串口号\n"
-                     "3、点击Browse选择上载的文件，点击Upload就可以开始烧写。\n\n";
-    QString usbStr="##USB 模式##\n"
-                   "1、脚本文件夹scripts必须与本程序放置与同一目录下。\n"
-                   "2、需要烧写的固件文件必须放置于用户主文件夹目录下。\n"
-                   "3、固件名字不可更改，必须为nuttx-px4fmu-v2-default.px4。\n"
-                   "4、脚本文件夹名称以及脚本文件名称均不允许修改。\n"
-                   "5、直接点击upload就可以开始自动擦除，下载，校验，重启。\n\n";
-    QString jlinkStr="##J-Link 模式##\n"
-                     "1、选择上载的文件，填写烧写的起始地址。\n"
-                     "2、点击Upload即可开始烧写。\n\n";
-    plainTextEdit->insertPlainText(wifiStr);
-    plainTextEdit->insertPlainText(usartStr);
-    plainTextEdit->insertPlainText(usbStr);
-    plainTextEdit->insertPlainText(jlinkStr);
+	QString wifiStr="##WiFi 模式##\n"
+					"1、填写TCP服务器的IP地址以及对应端口号（默认已设置好），然后连接。\n "
+					"2、点击Browse选择上载的文件，点击Upload就可以开始烧写。\n"
+					"3、连接上后也可以直接选择擦除芯片，点击Erase Chip。\n\n";
+	QString usartStr="##串口模式##\n"
+					 "1、分别选择串口的配置参数，再打开串口\n"
+					 "2、如果串口号列表中没有对应的串口，点击Refresh Serial Port更新串口号\n"
+					 "3、点击Browse选择上载的文件，点击Upload就可以开始烧写。\n\n";
+	QString usbStr="##USB 模式##\n"
+				   "1、脚本文件夹scripts必须与本程序放置与同一目录下。\n"
+				   "2、需要烧写的固件文件必须放置于用户主文件夹目录下。\n"
+				   "3、固件名字不可更改，必须为nuttx-px4fmu-v2-default.px4。\n"
+				   "4、脚本文件夹名称以及脚本文件名称均不允许修改。\n"
+				   "5、直接点击upload就可以开始自动擦除，下载，校验，重启。\n\n";
+	QString jlinkStr="##J-Link 模式##\n"
+					 "1、选择上载的文件，填写烧写的起始地址。\n"
+					 "2、点击Upload即可开始烧写。\n\n";
+	plainTextEdit->insertPlainText(wifiStr);
+	plainTextEdit->insertPlainText(usartStr);
+	plainTextEdit->insertPlainText(usbStr);
+	plainTextEdit->insertPlainText(jlinkStr);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -163,10 +159,10 @@ void TcpDialog::wifi_openFile()
 		if(!file.open(QIODevice::ReadOnly)) {     //以只读方式打开文件
 			qDebug()<<"can't open the file!"<<endl;
 		} else {
-            erasepushButton->setEnabled(false);
-            uploadpushButton->setEnabled(false);
-            plainTextEdit->insertPlainText(tr("\n==>>>Bin file is opened,Ready to Erase.\n"));
-            //progressBar->setMaximum(file.size()>>10);   //设置进度条的最大值为文件大小
+			erasepushButton->setEnabled(false);
+			uploadpushButton->setEnabled(false);
+			plainTextEdit->insertPlainText(tr("\n==>>>Bin file is opened,Ready to Erase.\n"));
+			//progressBar->setMaximum(file.size()>>10);   //设置进度条的最大值为文件大小
 			emit wifi_fileOpened();              //发送文件打开的信号，该信号与槽函数 clientReady（）连接。
 		}
 	}
@@ -180,7 +176,7 @@ void TcpDialog::usart_openFile()
 		if(!file.open(QIODevice::ReadOnly)) {
 			qDebug()<<"can't open the file!"<<endl;
 		} else {
-            plainTextEdit->insertPlainText(tr("\n==>>>Bin file is opened,Ready to Erase.\n"));
+			plainTextEdit->insertPlainText(tr("\n==>>>Bin file is opened,Ready to Erase.\n"));
 			progressBar->setMaximum(file.size()>>10);
 			emit usart_fileOpened();           //发射文件打开的信号，该信号与槽函数 uploadFile()连接
 		}
@@ -207,33 +203,33 @@ void TcpDialog::readFile()
 
 void TcpDialog::loadData(char* binArray, qint64 *length)
 {
-    binArray[0]=0x01;
-    binArray[1]=252;
-    *length=file.read(&(binArray[2]),252);     //每次欲读取252个字节，得到实际读取长度
-    binArray[1]=*length;
-    if((*length<252)||(file.atEnd())) {        //如果长度小于252，或者到了文件末尾
-        binArray[0]=0x02;                     //重写数据帧头
-        sendFlag=1;                           //置sendFlag为1，使下次数据请求无效
-        file.close();                         //关闭文件
-    }
-    *length=*length+2;
-    //tcpSocket.write(binArray,(length+2));     //发送填充好的数据帧
+	binArray[0]=0x01;
+	binArray[1]=252;
+	*length=file.read(&(binArray[2]),252);     //每次欲读取252个字节，得到实际读取长度
+	binArray[1]=*length;
+	if((*length<252)||(file.atEnd())) {        //如果长度小于252，或者到了文件末尾
+		binArray[0]=0x02;                     //重写数据帧头
+		sendFlag=1;                           //置sendFlag为1，使下次数据请求无效
+		file.close();                         //关闭文件
+	}
+	*length=*length+2;
+	//tcpSocket.write(binArray,(length+2));     //发送填充好的数据帧
 }
 
 //该成员函数是根据填写的IP和端口号连接TCP服务器
 void TcpDialog::connectToServer()
 {
-    unconnect_flag=0;
+	unconnect_flag=0;
 	if((!iplineEdit->text().isEmpty())&&(!portlineEdit->text().isEmpty())) {    //如果iplineEdit和portlineEdit非空
 		QString ipAdress = iplineEdit->text();         //得到ip地址
 		quint64 port = portlineEdit->text().toInt();   //得到端口号
-        //tcpSocket.abort();            //取消已有连接，重置套接字
+		//tcpSocket.abort();            //取消已有连接，重置套接字
 		tcpSocket.connectToHost(ipAdress,port);        //尝试连接到对应的IP和端口
 		connectpushButton->setEnabled(false);          //失能connect按钮，失能unconnect按钮
 		unconnectpushButton->setEnabled(true);
-        plainTextEdit->insertPlainText(tr("==>>>connecting ......\n"));
-        progressBar->setMaximum(0);
-        //progressBar->setValue(0);                      //是进度条动态显示
+		plainTextEdit->insertPlainText(tr("==>>>connecting ......\n"));
+		progressBar->setMaximum(0);
+		//progressBar->setValue(0);                      //是进度条动态显示
 		progressBar->show();
 	} else {                                           //如果ip和port有一个为空，则弹出提示
 		QMessageBox::warning(this,tr("warning"),tr("Please input the Server IP Adress and Port..."));
@@ -247,9 +243,9 @@ void TcpDialog::connectedToServer()
 	quint64 port = tcpSocket.peerPort();
 	erasepushButton->setEnabled(true);        //使能erase按钮
 	browsepushButton->setEnabled(true);       //使能browse按钮
-    if(!lineEdit->text().isEmpty())
-        uploadpushButton->setEnabled(true);
-    plainTextEdit->insertPlainText(tr("==>>>connected to Host, IP: %1 ,Port:  %2 \n\n").arg(ipAdress).arg(port));
+	if(!lineEdit->text().isEmpty())
+		uploadpushButton->setEnabled(true);
+	plainTextEdit->insertPlainText(tr("==>>>connected to Host, IP: %1 ,Port:  %2 \n\n").arg(ipAdress).arg(port));
 	progressBar->hide();
 }
 
@@ -257,64 +253,55 @@ void TcpDialog::connectedToServer()
 void TcpDialog::disconnectedToServer()
 {
 	tcpSocket.close();                        //关闭连接
-    plainTextEdit->insertPlainText(tr("\n==>>>Disconnected from host......\n"));
+	plainTextEdit->insertPlainText(tr("\n==>>>Disconnected from host......\n"));
 	connectpushButton->setEnabled(true);      //使能connect按钮
 	unconnectpushButton->setEnabled(false);   //失能unconnect按钮
-    erasepushButton->setEnabled(false);       //disable erasepushButton
-    uploadpushButton->setEnabled(false);      //disable uploadpushButton
+	erasepushButton->setEnabled(false);       //disable erasepushButton
+	uploadpushButton->setEnabled(false);      //disable uploadpushButton
 }
 
 void TcpDialog::onUnconnectionClicked()
 {
-    /*  UnconnectedState,
-        HostLookupState,
-        ConnectingState,
-        ConnectedState,
-        BoundState,
-        ListeningState,
-        ClosingState
-    */
-    unconnect_flag=1;
-    if(tcpSocket.state()==QTcpSocket::ConnectingState) {
-        closeConnection();    //ensure close the connection when connecting
-        return;
-    }
+	unconnect_flag=1;
+	if(tcpSocket.state()==QTcpSocket::ConnectingState) {
+		closeConnection();    //当正在连接时，直接调用相关函数关闭连接
+		return;
+	}
     returnUnconnectAck();
-    tcpSocket.waitForBytesWritten();
-    unconnectpushButton->setEnabled(false);
+	unconnectpushButton->setEnabled(false);
 }
 
 //该成员函数是关闭连接
 void TcpDialog::closeConnection()
 {
-	tcpSocket.flush();                        //清除网络缓存
-	file.close();                             //关闭文件
-    connectpushButton->setEnabled(true);      //使能、失能一部分按钮
-    unconnectpushButton->setEnabled(false);
-    browsepushButton->setEnabled(false);
-    erasepushButton->setEnabled(false);
+	tcpSocket.flush();                  //清除网络缓存
+	file.close();                       //关闭文件
+	connectpushButton->setEnabled(true);//使能、失能一部分按钮
+	unconnectpushButton->setEnabled(false);
+	browsepushButton->setEnabled(false);
+	erasepushButton->setEnabled(false);
 	sendpushButton->setEnabled(false);
-	sendFlag=0;                              //清理一些变量
+	sendFlag=0;                        //清理一些变量
 	times=0;
-    tcpSocket.close();                       //关闭TCP连接
-    tcpSocket.abort();                       //取消已有连接，重置套接字
+	tcpSocket.close();                 //关闭TCP连接
+	tcpSocket.abort();                 //取消已有连接，重置套接字
 	progressBar->hide();
-    plainTextEdit->insertPlainText(tr("\n==>>> close the current Tcp connection. \n"));
+	plainTextEdit->insertPlainText(tr("\n==>>> close the current Tcp connection. \n"));
 }
 
 void TcpDialog::cleanVariables()
 {
-    tcpSocket.flush();                        //清除网络缓存
-    file.close();                             //关闭文件
-    sendpushButton->setEnabled(false);
-    erasepushButton->setEnabled(true);
-    if(!lineEdit->text().isEmpty()) {
-        uploadpushButton->setEnabled(true);
-    }
-    sendFlag=0;                              //清理一些变量
-    times=0;
-    progressBar->hide();
-    plainTextEdit->insertPlainText(tr("\n==>>> Everything is OK ,Mission completed. \n"));
+	tcpSocket.flush();                 //清除网络缓存
+	file.close();                      //关闭文件
+	sendpushButton->setEnabled(false);
+	erasepushButton->setEnabled(true);
+	if(!lineEdit->text().isEmpty()) {
+		uploadpushButton->setEnabled(true);
+	}
+	sendFlag=0;                       //清理一些变量
+	times=0;
+	progressBar->hide();
+	plainTextEdit->insertPlainText(tr("\n==>>> Everything is OK ,Mission completed. \n"));
 }
 
 //该成员函数是清理plainTextEdit
@@ -342,175 +329,153 @@ void TcpDialog::sendMessageToServer()
  * 读取来自TCP server的数据
  * 根据最新的通信协议：
 TCP Server(ESP8266)与TCP客户端（Qt端）通信信号定义(C代表TCP客户端，S代表TCP服务器)
-	C-->S
-		模式（流程）选择信号（C-->S）： 0x01+0x20（upload模式）   0x02+0x20(erase模式)
-		回复信号（C-->S）:            0x12+0x10 (OK)
-		数据发送信号(C-->S):          0x01+<length>+<Data>(非结束帧)  0x02+<length>+<Data>(结束帧)
-	S-->C
-		数据请求信号（S-->C）:          0x31+0x01
-		擦除确认信号（S-->C）:          0x31+0x02
-		提示信号（S-->C）:             0x31+0x03
-		结束信号（S-->C）:             0x31+0x04
+  Qt-->ESP8266:
+
+    模式（流程）选择信号：   0x31+0x08（upload模式）
+                 0x31+0x09(erase模式)
+
+    回复信号:          0x31+0x10 (OK:程序继续)
+　　　　　　　　　　　　　0x31+0x11(invalid：调回至固件升级模式开始)
+　　　　　　　　　　　　　0x31+0x12(结束固件升级模式)
+
+    数据发送信号:        0x01+length+Data(非结束帧)
+                0x02+length+Data(结束帧)
+
+  ESP8266-->Qt:
+
+   数据请求信号:          0x31+0x01
+   擦除确认信号:          0x31+0x02
+   提示信号:             0x31+0x03
+   结束信号:             0x31+0x04
+   backupOk:            0x31+0x05
+   backupAlready:       0x31+0x06
 */
+
 void TcpDialog::readFromServer()
 {
-    char BinData[2540]={0};
-    qint64 length[10]={0};
-    quint16 lengthSum=0;
-    if(tcpSocket.bytesAvailable()==1) {
-        //plainTextEdit->insertPlainText("\n got only one.");
-        return;
-    }
-	QByteArray str =  tcpSocket.read(2);
-    if(tcpSocket.bytesAvailable()>=1) {
-        emit remainReadyRead();
-    }
-    //plainTextEdit->insertPlainText("\n got TWO.");
-	char *echo =str.data();
-	//QByteArray str =  tcpSocket.read(2);
-	//above is OK ,however it can't work at some situation
-/*
-	char echo[2];
+	char BinData[2540]={0};
+	qint64 length[10]={0};
+	quint16 lengthSum=0;
 	if(tcpSocket.bytesAvailable()==1) {
 		return;
-	} else if(tcpSocket.bytesAvailable()>=2) {
-		QByteArray str=tcpSocket.read(1);
-		char *temp1=str.data();
-		if((temp1[0]&0xf0)==0) {
-			QByteArray str1=tcpSocket.read(1);
-			char *temp2=str1.data();
-			echo[0]=temp1[0];
-			echo[1]=temp2[0];
-		} else {
-		echo[0]=0x01;
-		echo[1]=temp1[0];
-		//return;
-		}
 	}
-*/
+	QByteArray str =  tcpSocket.read(2);
+	if(tcpSocket.bytesAvailable()>=1) {
+		emit remainReadyRead();
+	}
+	char *echo =str.data();
 	progressBar->show();
-	if((echo[0]==0x31)&&(echo[1]==0x01)) {                        //数据请求：0x31+0x01 (可自定义)
-        #ifdef enable_unconnect
-            if(unconnect_flag==1) {
-                emit sendUnconnectAckToServer();
-                unconnect_flag=0;
-                return;   //out function
-            }
-        #endif
-        /*
-		if(sendFlag==0) {            
-			for(quint8 i=0;i<5;i++) {                             //重复发送五次，每次2+252字节
-				readFile();                                       //读取文件，填充发送数组，发送
-				if(sendFlag==1) break;                            //读取到文件末尾，跳出循环，不再发送              
-			}            
-			times++;
-			if(times%100==0) {                                    //5*252=1260=1.2kb   故大约120KB显示一次
-				plainTextEdit->insertPlainText(QString("send :   %1  KB \n").arg(times*5*252.0/1024.0));
+	if((echo[0]==0x31)&&(echo[1]==0x01)) {                 //数据请求：0x31+0x01 (可自定义)
+        /*#ifdef enable_unconnect
+			if(unconnect_flag==1) {
+				emit sendUnconnectAckToServer();
+				unconnect_flag=0;
+				return;   //out function
 			}
-			progressBar->setValue(times*5*252>>10);               //使进度条同步
-		} else if(sendFlag==1) {                                  //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
-			// return;
-        }*/
+        #endif*/
 
-         if(sendFlag==0) {
-                for(quint8 i=0;i<10;i++) {                             //重复发送五次，每次2+252字节
-                    loadData(&BinData[i*254],&length[i]);                 //读取文件，填充发送数组，发送
-                    lengthSum=lengthSum+length[i];
-                    if(sendFlag==1) break;                            //读取到文件末尾，跳出循环，不再发送
-                }
-                tcpSocket.write(BinData,lengthSum);
-                tcpSocket.waitForBytesWritten();
-                times++;
-                if(times%50==0) {                                    //5*252=1260=1.2kb  20*254*25 故大约120KB显示一次
-                    plainTextEdit->insertPlainText(QString("==>>> send :   %1  KB \n").arg(times*10*252.0/1024.0));
-                }
-                progressBar->setValue(times*10*252>>10);               //使进度条同步
-            } else if(sendFlag==1) {                                  //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
-                // return;
-         }
-	} else if((echo[0]==0x31)&&(echo[1]==0x02)) {                 // 芯片擦除请求: 0x31+0x02(可自定义)
-        #ifdef enable_unconnect
-            if(unconnect_flag==1) {
-                emit sendUnconnectAckToServer();
-                unconnect_flag=0;
-                return;   //out function
-            }
-        #endif
-        plainTextEdit->insertPlainText("\n==>>> Got the erase request \n");
+		if(sendFlag==0) {
+			for(quint8 i=0;i<10;i++) {                //重复装载数据十次至发送数组BinData中，每次2+252字节
+				loadData(&BinData[i*254],&length[i]); //读取文件，填充发送数组
+				lengthSum=lengthSum+length[i];
+				if(sendFlag==1) break;                //读取到文件末尾，跳出循环，不再发送
+			}
+			tcpSocket.write(BinData,lengthSum);       //发送整个发送数组
+			tcpSocket.waitForBytesWritten();          //等待发送完成
+			times++;
+			if(times%50==0) {                         //10*252=2520=2.4kb  10*254*50 故大约120KB显示一次
+				plainTextEdit->insertPlainText(QString("==>>> send :   %1  KB \n").arg(times*10*252.0/1024.0));
+			}
+			progressBar->setValue(times*10*252>>10);  //使进度条同步
+		} else if(sendFlag==1) {                      //如果已经读取到文件末尾并发送，那么再接收到数据请求就忽略
+			// return;
+		}
+	} else if((echo[0]==0x31)&&(echo[1]==0x02)) {     // 芯片擦除请求: 0x31+0x02(可自定义)
+		#ifdef enable_unconnect
+			if(unconnect_flag==1) {
+				emit sendUnconnectAckToServer();
+				unconnect_flag=0;
+				return;   //out function
+			}
+		#endif
+        plainTextEdit->insertPlainText("\n==>>> Got the Erase Confirm Request \n");
 		int choice=QMessageBox::information(this,"Confirm","Ensure to erase the chip?",QMessageBox::Yes,QMessageBox::No);
 		if(choice==QMessageBox::Yes) {
-            plainTextEdit->insertPlainText("==>>> Begin to Erase... \n");
-            progressBar->show();    //erase progressbar show
-			emit sendAckToServer();                              //发射回复信号，该信号连接至槽函数returnAck
+            plainTextEdit->insertPlainText("==>>> Begin to Backup and Erase... \n==>>>Backup......\n");
+			progressBar->show();                     //擦除进度条显示
+			emit sendAckToServer();                  //发射回复信号，该信号连接至槽函数returnAck
 		} else if(choice==QMessageBox::No) {
-            plainTextEdit->insertPlainText("==>>> Cancel to Erase... \n");
-
-            tcpSocket.flush();                        //清除网络缓存
-            file.close();                             //关闭文件
-            sendpushButton->setEnabled(false);
-            erasepushButton->setEnabled(true);
-            if(!lineEdit->text().isEmpty()) {
-                uploadpushButton->setEnabled(true);
-            }
-            sendFlag=0;                              //清理一些变量
-            times=0;
-            //progressBar->hide();
-            emit sendCancelAckToServer();                        //暂时：无论你选yes或no都按找正常流程走。待逻辑定好再修改此处
+			plainTextEdit->insertPlainText("==>>> Cancel to Erase... \n");
+            progressBar->hide();
+			tcpSocket.flush();                      //清除网络缓存
+			file.close();                           //关闭文件
+			sendpushButton->setEnabled(false);
+			erasepushButton->setEnabled(true);
+			if(!lineEdit->text().isEmpty()) {
+				uploadpushButton->setEnabled(true);
+			}
+			sendFlag=0;                            //清理一些变量
+			times=0;
+			emit sendCancelAckToServer();          //暂时：无论你选yes或no都按找正常流程走。待逻辑定好再修改此处
 		}
 		//此处添加可添加一个确认对话框
-	} else if((echo[0]==0x31)&&(echo[1]==0x03)) {                //ESP已经做好接受bin文件数据的准备:0x31+0x03(可自定义)
-        #ifdef enable_unconnect
-            if(unconnect_flag==1) {
-                emit sendUnconnectAckToServer();
-                unconnect_flag=0;
-                return;   //out function
-            }
-        #endif
-        plainTextEdit->insertPlainText("\n==>>> Got the Ready Request \n");
-        progressBar->hide();    //erase progressbar hide
-        progressBar->setMaximum(file.size()>>10);   //设置进度条的最大值为文件大小
-        progressBar->setValue(0);
-        progressBar->show();
+	} else if((echo[0]==0x31)&&(echo[1]==0x03)) { //ESP已经做好接受bin文件数据的准备:0x31+0x03(可自定义)
+		#ifdef enable_unconnect
+			if(unconnect_flag==1) {
+				emit sendUnconnectAckToServer();
+				unconnect_flag=0;
+				return;   //出接收程序，不执行后续操作
+			}
+		#endif
+        plainTextEdit->insertPlainText("\n==>>> Got the Ready Confirm Request \n");
+		progressBar->hide();    //erase progressbar hide
+		progressBar->setMaximum(file.size()>>10);  //设置进度条的最大值为文件大小
+		progressBar->setValue(0);
+		progressBar->show();
 		emit sendAckToServer();
-	} else if((echo[0]==0x31)&&(echo[1]==0x04)) {                //结束命令：0x31+0x04(可自定义)
-        #ifdef enable_unconnect
-            if(unconnect_flag==1) {
-                emit sendUnconnectAckToServer();
-                unconnect_flag=0;
-                return;   //out function
-            }
-        #endif
-        returnAck();                                             //直接调用槽函数，返回回复信号 0x12+0x10
+	} else if((echo[0]==0x31)&&(echo[1]==0x04)) { //结束命令：0x31+0x04(可自定义)
+		#ifdef enable_unconnect
+			if(unconnect_flag==1) {
+				emit sendUnconnectAckToServer();
+				unconnect_flag=0;
+				return;   //退出接收程序，不执行后续操作
+			}
+		#endif
+        returnAck();      //直接调用槽函数，返回回复信号 0x31+0x10
 
-        plainTextEdit->insertPlainText("\n==>>> Got the Finished request \n");
-        cleanVariables();
-        //closeConnection();                                       //整个过程结束，需要关闭及清理相应东西
+        plainTextEdit->insertPlainText("\n==>>> Got the Finished Confirm Request \n");
+		cleanVariables(); //整个过程结束，需要关闭及清理相应东西
 		progressBar->hide();
-        progressBar->setMaximum(0);
+		progressBar->setMaximum(0);
 
-	} else {                                                     //如果是异常数据，显示出来
+    } else if((echo[0]==0x31)&&(echo[1]==0x05)) {
+        plainTextEdit->insertPlainText("==>>>finish to Backup\n\n==>>>Erase......\n");
+    } else if((echo[0]==0x31)&&(echo[1]==0x06)) {
+         plainTextEdit->insertPlainText("==>>>Backup has already exit\n\n==>>>Erase......\n");
+    }
+    else {             //如果是异常数据，显示出来
 		plainTextEdit->insertPlainText(QByteArray(echo).toHex());
 		plainTextEdit->appendPlainText(tr("\n"));
 	}
 }
 
-//该成员函数是发送回复信号：0x12+0x10
+//该成员函数是发送回复信号：0x31+0x10
 void TcpDialog::returnAck()
 {
-	char ackData[2]={0x12,0x10};
+    char ackData[2]={0x31,0x10};
 	tcpSocket.write(ackData,sizeof(ackData));
 }
 
-//
+//该成员函数是发送cancelErase信号：0x31+0x10
 void TcpDialog::returnCancelAck()
 {
-    char cancelAckData[2]={0x12,0x14};
+    char cancelAckData[2]={0x31,0x11};
     tcpSocket.write(cancelAckData,sizeof(cancelAckData));
 }
 
 void TcpDialog::returnUnconnectAck()
 {
-    char UnconnectAckData[2]={0x0c,0x03};
+    char UnconnectAckData[2]={0x31,0x12};
     tcpSocket.write(UnconnectAckData,sizeof(UnconnectAckData));
     tcpSocket.waitForBytesWritten(300);
     //closeConnection();
@@ -520,7 +485,7 @@ void TcpDialog::returnUnconnectAck()
 //该成员函数与已打开文件信号对应，发送执行upload流程命令
 void TcpDialog::clientReady()
 {
-	char readySignal[2]={0x01,0x20};                       //如果接收的数据为0x01+0x20，执行upload流程
+    char readySignal[2]={0x31,0x08};                    //如果接收的数据为0x31+0x08，执行upload流程
 	tcpSocket.write(readySignal,sizeof(readySignal));
 }
 
@@ -530,16 +495,16 @@ void TcpDialog::sendEraseData()
 	//TO DO
 	//there should be sending the customed erase signal
 	//and  you should match the signal in the firmware of ESP8266
-	char eraseSignal[2]={0x02,0x20};                      //如果接收的数据为0x02+0x20，执行erase流程
+    char eraseSignal[2]={0x31,0x09};                   //如果接收的数据为0x31+0x09，执行erase流程
 	tcpSocket.write(eraseSignal,sizeof(eraseSignal));
-    erasepushButton->setEnabled(false);
-    uploadpushButton->setEnabled(false);
+	erasepushButton->setEnabled(false);
+	uploadpushButton->setEnabled(false);
 	//TO DO
 }
 
 
 /************************************************/
-/*                     该部分为USART方式下的部分函数                  */
+/*         该部分为USART方式下的部分函数            */
 /************************************************/
 
 //该成员函数是填充串口的一些参数框
@@ -549,9 +514,11 @@ void TcpDialog::fillPortsParameters()
 	baudRatecomboBox->addItem(QStringLiteral("57600"),QSerialPort::Baud57600);
 	baudRatecomboBox->addItem(QStringLiteral("115200"),QSerialPort::Baud115200);
 	baudRatecomboBox->addItem(tr("Custom"));                                     //波特率：当前9600
+    baudRatecomboBox->setCurrentIndex(2);
 
 	stopBitscomboBox->addItem(QStringLiteral("1"),QSerialPort::OneStop);         //停止位：当前1位停止位
 	stopBitscomboBox->addItem(QStringLiteral("2"),QSerialPort::TwoStop);
+    stopBitscomboBox->setCurrentIndex(0);
 
 	dataBitscomboBox->addItem(QStringLiteral("7"),QSerialPort::Data7);           //数据位
 	dataBitscomboBox->addItem(QStringLiteral("8"),QSerialPort::Data8);
@@ -561,6 +528,11 @@ void TcpDialog::fillPortsParameters()
 	paritycomboBox->addItem(QStringLiteral("Odd"),QSerialPort::OddParity);
 	paritycomboBox->addItem(QStringLiteral("None"),QSerialPort::NoParity);
 	paritycomboBox->setCurrentIndex(2);
+
+    baudRatecomboBox->setEnabled(false);
+    stopBitscomboBox->setEnabled(false);
+    dataBitscomboBox->setEnabled(false);
+    paritycomboBox->setEnabled(false);
 }
 
 //该成员函数是填充串口端口号
@@ -570,8 +542,7 @@ void TcpDialog::fillPortsNames()
 		QStringList list;
 		list << info.portName();                               //将串口名赋予list
 		serialPortcomboBox->addItem(list.first(),list);        //把list添加至串口端口选择框
-	}
-	serialPortcomboBox->addItem(tr("Custom"));                 //增加自定义选项
+    }
 }
 
 //该成员函数是更新串口端口
@@ -582,8 +553,7 @@ void TcpDialog::refreshSerialPorts()
 		QStringList list;
 		list << info.portName()  ;
 		serialPortcomboBox->addItem(list.first(),list);
-	}
-	serialPortcomboBox->addItem(tr("Custom"));
+    }
 }
 
 //该成员函数是提取各参数选择框中的参数，并启动串口
@@ -656,7 +626,7 @@ void TcpDialog::startApplication()
 // 遵守Bootloader程序中定义的协议
 /* *
  *  跳转指令：		{0xfe,0x21,0x72,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x01,0x00,0x00,0x48,0xf0};
-							{0xfe,0x21,0x45,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x00,0x00,0x00,0xd7,0xac};
+					{0xfe,0x21,0x45,0xff,0x00,0x4c,0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xf6,0x00,0x00,0x00,0x00,0xd7,0xac};
  *  同步信号：                      0x21+0x20
  *  擦除信号：                      0x23+0x20
  *  烧写信号：                      0x27+<length>+<Data>+0x20

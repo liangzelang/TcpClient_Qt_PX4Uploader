@@ -24,4 +24,9 @@ expect "J-Link>" {
 	send "loadbin $fileName $fileAddr\r"
 	
 }
+
+expect "J-Link>" {
+	exit
+}
+
 interact
